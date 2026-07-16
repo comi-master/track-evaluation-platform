@@ -1,2 +1,2 @@
-/** Object-storage abstraction and MinIO adapter. Planned for milestone 3. */
+/** Object-storage abstraction and storage adapters. */
 package com.example.trackanalysis.storage;

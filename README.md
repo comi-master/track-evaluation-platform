@@ -2,7 +2,7 @@
 
 `track-analysis-platform` 是一个面向 Java 后端工程实践的模块化单体项目。目标业务闭环是：安全地接收七列航迹 CSV，流式解析和批量入库，异步计算三维误差与连续异常区间，并管理分析结果和模板报告。
 
-> 当前状态：唯一有效路线共七个里程碑（0—6）。里程碑 0（工程骨架与开发环境）已完成真实环境验收，里程碑 1 是下一阶段但尚未开始。项目以 Java 17 为当前统一基线；19 个测试、应用烟测和四个 Compose 服务的健康及实际可用性检查均已通过。数据库业务表、认证、上传、分析、消息、缓存和报告业务仍未实现。
+> 当前状态：唯一有效路线共七个里程碑（0—6）。里程碑 0 和里程碑 1 已完成；数据库与持久化基础已通过 Java 17、MySQL 8.4 Testcontainers、本地应用烟测和独立审查。当前只有 `sys_user`、`dataset` 两张业务表；里程碑 2 尚未开始，认证、上传、分析、消息、缓存和报告业务仍未实现。
 
 ## 当前功能
 
@@ -10,16 +10,20 @@
 - `X-Request-Id`：接受安全的调用方 ID，缺失或不安全时生成 UUID，并写入响应头和 MDC。
 - 全局异常映射：稳定业务错误码、合理 HTTP 状态、安全的未知错误响应。
 - Actuator：health、info、metrics、Prometheus 端点基础配置。
-- Compose 基础依赖定义：MySQL、Redis、RabbitMQ、MinIO（尚未接入应用代码）。
+- Compose 基础依赖定义：MySQL、Redis、RabbitMQ、MinIO；当前只有 MySQL 接入应用持久化。
+- Flyway 管理的 `sys_user`、`dataset` schema，以及 MyBatis-Plus Mapper、分页、逻辑删除、乐观锁、UTC 自动填充和全表操作防护。
+
+当前范围边界：没有注册或登录，没有数据集业务接口，没有生产 XML Mapper，也没有文件上传、航迹分析、RabbitMQ、Redis 业务缓存或报告功能；里程碑 2 尚未开始。
 
 ## 技术基线
 
 - Java 17 bytecode/API target, Maven, Spring Boot 3.5.15
 - Spring MVC, Validation, Actuator, Micrometer Prometheus registry
-- JUnit 5, MockMvc, AssertJ, JaCoCo, Spotless
+- Flyway 11.20.1, MyBatis-Plus 3.5.17, MySQL Connector/J
+- JUnit 5, MockMvc, AssertJ, Testcontainers, JaCoCo, Spotless
 - MySQL 8.4, Redis 8.x, RabbitMQ 4.x, MinIO through Docker Compose
 
-MyBatis/Flyway/Security/Redis/RabbitMQ/MinIO application dependencies are deliberately deferred to their milestones.
+Security、Redis、RabbitMQ 和 MinIO 应用依赖仍按各自里程碑推迟。当前没有生产 MyBatis XML；首个真实 XML 预计随批量航迹点写入引入。
 
 ## Architecture
 
@@ -32,7 +36,7 @@ flowchart LR
     Adapters --> Infra["MySQL / Redis / RabbitMQ / MinIO"]
 ```
 
-The current code only contains `common` and empty feature package boundaries. See [docs/architecture.md](docs/architecture.md) for current-versus-target detail.
+The current code contains the cross-cutting HTTP foundation plus user/dataset persistence adapters. See [docs/architecture.md](docs/architecture.md) for current-versus-target detail.
 
 ## Core target flow
 
@@ -50,6 +54,11 @@ PowerShell:
 Copy-Item .env.example .env
 # Replace every placeholder in .env before starting containers.
 docker compose up -d
+# Export the ignored .env values to this shell; Spring Boot does not read .env implicitly.
+Get-Content .env | Where-Object { $_ -match '^[A-Z][A-Z0-9_]*=' } | ForEach-Object {
+    $name, $value = $_ -split '=', 2
+    Set-Item -Path "Env:$name" -Value $value
+}
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -59,6 +68,9 @@ POSIX shell:
 cp .env.example .env
 # Replace every placeholder in .env before starting containers.
 docker compose up -d
+set -a
+. ./.env
+set +a
 ./mvnw spring-boot:run
 ```
 
@@ -85,7 +97,7 @@ All middleware ports bind to `127.0.0.1` by default through `BIND_ADDRESS`. Over
 | Redis | 6379 | `REDIS_PASSWORD` |
 | RabbitMQ | 5672, 15672 | `RABBITMQ_DEFAULT_PASS` |
 | MinIO | 9000, 9001 | `MINIO_ROOT_PASSWORD` |
-| Application | 8080 | none in milestone 0 |
+| Application | 8080 | `MYSQL_HOST`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_PORT` |
 
 ## API documentation
 
@@ -93,13 +105,15 @@ The implemented endpoint contract is in [docs/api.md](docs/api.md). Interactive 
 
 ## Demo account initialization
 
-No authentication or demo account exists in milestone 0. A repeatable, non-hardcoded initialization mechanism will be added with authentication and demo closeout milestones.
+No authentication or demo account exists. A repeatable, non-hardcoded initialization mechanism will be added with authentication and demo closeout milestones.
 
 ## Build and test
 
 ```powershell
 .\mvnw.cmd spotless:apply
 .\mvnw.cmd clean verify
+# Requires Docker and runs MySQL 8.4 Testcontainers integration tests.
+.\mvnw.cmd clean verify -Pit
 ```
 
 JaCoCo HTML output is generated under `target/site/jacoco/`. Test and coverage results are only considered verified after these commands complete successfully on the current checkout; see [PLANS.md](PLANS.md) for the latest recorded status.
@@ -109,9 +123,10 @@ JaCoCo HTML output is generated under `target/site/jacoco/`. Test and coverage r
 On 2026-07-16, `java` and Maven Wrapper both used JetBrains OpenJDK 17.0.14 from `D:\java\JDK17`. Maven 3.9.11 compiled with `--release 17` and produced Java 17 class-file version 61.
 
 - `spotless:apply` and `spotless:check`: passed.
-- `clean verify`: passed; 19 tests, 0 failures, 0 errors, 0 skipped.
-- Dependency tree: completed with no Maven warnings and no conflict-omission entries.
-- Packaged application smoke test on JDK 17: `/actuator/health` returned `UP`; `/api/v1/ping` returned `SUCCESS` and preserved the supplied request ID. The process stopped cleanly.
+- `clean verify`: passed without starting Docker; 19 tests, 0 failures, 0 errors, 0 skipped.
+- `clean verify -Pit`: passed with MySQL 8.4 Testcontainers; 19 ordinary tests plus 20 persistence integration tests, 0 failures, 0 errors, 0 skipped.
+- Dependency tree: completed without an additional raw MyBatis starter or unresolved version conflict. Flyway was minimally overridden within major version 11 because Boot's managed 11.7.2 warned that MySQL 8.4 had not been tested; 11.20.1 passed the complete suite without that warning.
+- Packaged application smoke test on JDK 17: the first local MySQL start applied V1/V2, repeated starts applied no migration, `/actuator/health` returned `UP`, `/api/v1/ping` returned `SUCCESS`, and the request ID matched in header and body. The process stopped cleanly and the checked logs contained no MySQL password.
 - Docker: Desktop 4.82.0, Engine 29.6.1 on Linux/amd64, and Compose v5.3.0. A forced recreation preserved all named volumes; MySQL, Redis, RabbitMQ, and MinIO all reached `healthy`, passed service-specific connection or endpoint checks, and published ports only on `127.0.0.1`. MySQL and Redis health checks authenticate through process environment variables rather than password arguments. Redis validates its password, creates a `600 redis:redis` temporary configuration on every start, and keeps the real value out of container command metadata, PID 1 arguments, health-check metadata, and logs.
 - The first two Docker Hub pulls ended with transient `EOF`; the third finite retry succeeded without changing image tags.
 - WSL 2.7.10.0 is installed and Ubuntu uses WSL 2.
@@ -144,9 +159,9 @@ No performance measurements exist yet. Basic, honest same-machine measurements b
 
 ## Known limitations
 
-- Milestones 1-6 are pending; this is not yet the full business product.
+- Milestones 2-6 are pending; milestone 2 has not started, and this is not yet the full business product.
 - The Maven Wrapper works without global Maven. The supported and verified runtime is JDK 17; an installed JDK 25 is not used by the project acceptance workflow.
-- Compose services are infrastructure-only in milestone 0. The Spring Boot application deliberately has no business integration with them yet.
+- Compose services other than MySQL remain infrastructure-only. The Spring Boot application currently uses MySQL persistence but has no Redis, RabbitMQ, or MinIO business integration.
 - Docker Hub can occasionally return a transient `EOF`; use a finite retry and inspect Docker Desktop proxy/network settings if it persists.
 - A Prometheus/Grafana monitoring platform is outside the first release. Existing Actuator/Micrometer endpoint support does not mean that platform has been implemented.
 

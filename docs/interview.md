@@ -47,3 +47,15 @@ This file grows only from implemented and verified project evidence. Resume desc
 **Second follow-up — when should Outbox be reconsidered?** When verified delivery-risk requirements justify its extra schema, publisher, recovery, monitoring, and duplicate-handling costs.
 
 **Project evidence:** the active scope in `PLANS.md` and ADR 0003. This is a planning decision, not evidence that messaging has already been implemented.
+
+## Why use Flyway and real MySQL integration tests?
+
+**Base answer:** Versioned immutable migrations make schema changes reproducible, while MySQL 8.4 Testcontainers verifies behavior that an in-memory substitute could misrepresent.
+
+**First follow-up — what was tested?** Empty and repeated migration, checksums, schema metadata, constraints, owner pagination, logical deletion, optimistic locks, UTC fills, and full-table update blocking.
+
+**Second follow-up — why are normal tests separate?** The default `clean verify` remains fast and Docker-independent; `-Pit` explicitly opts into real database acceptance and fails when Docker is unavailable.
+
+**Third follow-up — why only two tables?** `sys_user` and `dataset` are the immediate persistence prerequisites. File, track, analysis, report, role, audit, and Outbox tables wait until their business rules and access paths are known.
+
+**Project evidence:** Flyway V1/V2, feature-local DO/Mapper classes, and the four persistence `*IT` suites. There are still no authentication or dataset HTTP use cases.

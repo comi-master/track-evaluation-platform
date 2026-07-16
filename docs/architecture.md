@@ -1,8 +1,8 @@
 # Architecture
 
-## Current milestone 0
+## Current milestone 1
 
-The application is a single Spring Boot process. Only cross-cutting HTTP behavior and feature package boundaries exist. Compose defines external services but the application has no SDK, connection, or persistence code for them yet.
+The application remains one Spring Boot process. Cross-cutting HTTP behavior now coexists with a MySQL persistence foundation for users and datasets. Flyway owns schema versions, while feature-local MyBatis-Plus mappers own persistence mapping. No authentication, dataset use case, upload, analysis, messaging, cache, report, or production XML mapper exists yet.
 
 ```mermaid
 flowchart TD
@@ -12,6 +12,9 @@ flowchart TD
     Error["Exception"] --> Handler["GlobalExceptionHandler"]
     Handler --> Result
     Actuator["Spring Boot Actuator"] --> Health["health / info / metrics / prometheus"]
+    Flyway["Flyway V1/V2"] --> MySQL["MySQL: sys_user / dataset"]
+    UserMapper["user persistence mapper"] --> MySQL
+    DatasetMapper["dataset persistence mapper"] --> MySQL
 ```
 
 ## Target modular monolith
@@ -79,7 +82,7 @@ Spring Security authenticates an access token, builds the security context, and 
 
 ## Delivery boundary
 
-The active route contains seven milestones numbered 0-6. Milestone 0 is complete and milestone 1 is next but has not started. The first release remains a modular monolith and prioritizes a demonstrable upload-analysis-report business closure over infrastructure breadth. The former 0-12 route is a historical plan, has been retired, and is not the current execution route. Transactional Outbox, microservice decomposition, and a Prometheus/Grafana platform are future extensions only.
+The active route contains seven milestones numbered 0-6. Milestone 0 is complete and milestone 1 persistence acceptance has passed; milestone 2 has not started. The first release remains a modular monolith and prioritizes a demonstrable upload-analysis-report business closure over infrastructure breadth. The former 0-12 route is historical. Transactional Outbox, microservice decomposition, and a Prometheus/Grafana platform are future extensions only.
 
 ## Dependency rules
 

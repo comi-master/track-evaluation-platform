@@ -1,2 +1,2 @@
-/** Analysis task state machine and orchestration. Planned for milestones 5 and 6. */
+/** Analysis task state machine and orchestration boundaries. */
 package com.example.trackanalysis.task;

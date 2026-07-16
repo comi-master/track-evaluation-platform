@@ -1,2 +1,2 @@
-/** Track error analysis and abnormal-interval rules. Planned for milestone 5. */
+/** Track error analysis and abnormal-interval rules. */
 package com.example.trackanalysis.analysis;

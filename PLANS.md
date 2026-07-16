@@ -4,14 +4,14 @@ Status values: `NOT_STARTED`, `IN_PROGRESS`, `BLOCKED`, `COMPLETE`. A milestone 
 
 ## Active roadmap
 
-The only active delivery route contains seven milestones, numbered 0-6. Milestone 0 is complete; milestone 1 is the next stage and has not started. Business closure takes priority over accumulating infrastructure components.
+The only active delivery route contains seven milestones, numbered 0-6. Milestones 0 and 1 are complete; milestone 2 has not started. Business closure takes priority over accumulating infrastructure components.
 
 The former milestone 0-12 route is a historical plan, has been retired, and is not the current execution route. It must not be restored from old tasks, prompts, or repository history.
 
 | # | Goal and scope | Acceptance focus | Status |
 | --- | --- | --- | --- |
 | 0 | Engineering foundation and development environment: Java 17, Spring Boot 3.5.15, Maven Wrapper, response/error/request ID conventions, Compose for MySQL/Redis/RabbitMQ/MinIO, baseline tests, engineering and security rules | Recorded formatting/build/application/Compose acceptance is complete | COMPLETE |
-| 1 | Database and persistence foundation: Flyway, MyBatis-Plus, necessary MyBatis XML, core business tables, database conventions, indexes/constraints, Testcontainers MySQL, persistence integration tests | Empty database migrates; mapper and persistence integration tests pass; indexes and constraints match verified access paths | NOT_STARTED |
+| 1 | Database and persistence foundation: Flyway, MyBatis-Plus, necessary MyBatis XML, core business tables, database conventions, indexes/constraints, Testcontainers MySQL, persistence integration tests | Empty database migrates; mapper and persistence integration tests pass; indexes and constraints match verified access paths | COMPLETE |
 | 2 | User authentication and dataset management: registration/login, BCrypt, Spring Security, JWT, logout, user data isolation, dataset CRUD, pagination and search | Authentication/authorization and ownership boundaries are tested; dataset operations are usable | NOT_STARTED |
 | 3 | CSV upload, MinIO and streaming parsing: validation, SHA-256 deduplication, raw object storage, Apache Commons CSV, streaming parsing, batch track-point persistence, error-row location | Valid files complete the upload-to-persistence path; invalid and partial-failure paths are tested without loading a complete upload into memory | NOT_STARTED |
 | 4 | Complete track-analysis business closure: 3D position error, mean error, RMSE, extrema, standard deviation, abnormal points and continuous intervals, multi-source comparison, synchronous analysis and result query | The first complete, demonstrable and resume-usable business workflow works end to end, with truthful algorithm and integration evidence | NOT_STARTED |
@@ -44,7 +44,7 @@ Milestone 0 was completed by commit `a636d09` (`chore: initialize project founda
 
 The recorded 2026-07-16 acceptance used JetBrains OpenJDK 17.0.14 and Maven 3.9.11. Spotless checks and `clean verify` passed with 19 tests and no failures, errors, or skips. The packaged application smoke test passed, and all four Compose services reached healthy and passed the recorded service checks. These are milestone 0 results only; no later business feature is thereby claimed.
 
-Milestone 1 has not started. There are no Flyway migrations, persistence entities/mappers, authentication, upload workflow, analysis workflow, messaging consumer, result cache, or report business functions yet.
+Milestone 1 has Flyway V1/V2, `sys_user` and `dataset`, feature-local MyBatis-Plus mappers, UTC persistence configuration, and isolated MySQL 8.4 Testcontainers coverage. Java 17 ordinary verification ran 19 tests without Docker; `-Pit` ran those 19 plus 20 persistence ITs, all with zero failures, errors, or skips. Local application smoke testing applied V1/V2 once, observed no repeat migration, returned `UP` and `SUCCESS`, preserved request ID, and stopped cleanly. Independent review completed with no Critical or High findings, and its documentation/test-evidence findings were corrected and reverified. Authentication, upload, analysis, messaging, cache, and report business functions remain unimplemented; milestone 2 has not started.
 
 ## Project-level Definition of Done
 

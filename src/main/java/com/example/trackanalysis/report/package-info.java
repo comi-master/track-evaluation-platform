@@ -1,2 +1,2 @@
-/** Analysis report generation and history. Planned for milestone 5. */
+/** Analysis report generation and history. */
 package com.example.trackanalysis.report;

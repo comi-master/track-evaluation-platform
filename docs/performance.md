@@ -22,6 +22,6 @@ Pending. Empty by design to prevent invented measurements.
 
 ## Query plans and limitations
 
-Pending milestone 1 query-plan evidence and milestone 6 basic performance measurements. Any future conclusion must retain environment and measurement limitations.
+The milestone 1 integration suite executed `EXPLAIN` for owner-scoped active-dataset pagination on MySQL 8.4 and confirmed that the SQL is explainable while separately verifying the declared index columns and order. The fixture is intentionally small, so the suite does not force a particular optimizer choice and no speedup, latency, throughput, or large-data conclusion is claimed. Basic performance measurements remain pending milestone 6.
 
 The active route has seven milestones numbered 0-6. The former dedicated performance milestone in the 0-12 route is a historical plan, has been retired, and is not the current execution route. No performance result is claimed until it is measured.

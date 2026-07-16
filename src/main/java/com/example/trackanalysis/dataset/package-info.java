@@ -1,2 +1,2 @@
-/** Dataset ownership and lifecycle feature. Planned for milestone 3. */
+/** Dataset ownership, metadata, and lifecycle boundaries. */
 package com.example.trackanalysis.dataset;

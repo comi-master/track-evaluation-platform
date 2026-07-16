@@ -1,2 +1,2 @@
-/** RabbitMQ publishing and consumption adapters. Planned for milestone 6. */
+/** Message publishing and consumption adapters. */
 package com.example.trackanalysis.messaging;

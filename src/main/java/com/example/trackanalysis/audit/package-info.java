@@ -1,2 +1,2 @@
-/** Operation audit trail. Planned for milestone 9. */
+/** Operation audit trail boundaries. */
 package com.example.trackanalysis.audit;

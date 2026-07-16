@@ -1,2 +1,2 @@
-/** Transactional outbox feature. Planned for milestone 7. */
+/** Reserved future extension; Transactional Outbox is excluded from the first release. */
 package com.example.trackanalysis.outbox;

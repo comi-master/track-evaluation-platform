@@ -18,18 +18,28 @@
 - Compose credential-handling structure and Redis password-policy behavior, including safe rejection without value disclosure.
 - PowerShell and POSIX environment-check regression harnesses for normal and five failure modes.
 
-## Commands
+## Commands and profile boundary
 
 ```powershell
 .\mvnw.cmd spotless:check
 .\mvnw.cmd clean verify
+.\mvnw.cmd clean verify -Pit
 .\scripts\test-check-environment.ps1
 bash ./scripts/test-redis-password-policy.sh
 ```
 
 Run `./scripts/test-check-environment.sh` from a POSIX shell for the equivalent script regression suite. Run `./scripts/test-redis-password-policy.sh` to verify the Redis entrypoint policy without starting a container.
 
-The default suite must not need manually running infrastructure. Container-backed `*IT` tests will be bound to Maven verification when their dependencies are introduced.
+The default suite runs 19 ordinary tests and does not activate Failsafe or Testcontainers. The `it` profile binds Failsafe to `*IT`, requires Docker, and runs an isolated MySQL 8.4 container. Docker unavailability fails `-Pit` explicitly; it is never converted to a skipped test.
+
+## Milestone 1 persistence suite
+
+- `FlywayMigrationIT`: empty schema, V1/V2 history, success/checksum, repeat migrate, UTC session.
+- `DatabaseConstraintIT`: table/column/default metadata, PK/UK/FK/CHECK/NOT NULL, permanent case-insensitive username uniqueness, owner-page index order.
+- `SysUserMapperIT`: insert/query/generated ID, UTC fills, logical delete, optimistic lock, BlockAttack.
+- `DatasetMapperIT`: owner relation, pagination and stable ordering, logical delete, owner isolation, optimistic lock, executable `EXPLAIN`.
+
+Every IT uses a JUnit-managed Testcontainer with independent credentials and database. Class-level Spring transactions roll back fixtures, contexts and containers close after each class, and no test reads the local Compose datasource.
 
 ## Failure scenarios by roadmap
 
@@ -42,8 +52,12 @@ The default suite must not need manually running infrastructure. Container-backe
 
 No later failure scenario is marked tested until its test has actually run.
 
-The active test route follows milestones 0-6; milestone 0 is complete and milestone 1 is next but has not started. Transactional Outbox recovery and Prometheus/Grafana platform tests are outside the first-release suite unless separately approved. The former 0-12 route is a historical plan, has been retired, and is not the current execution route.
+The active test route follows milestones 0-6. Milestone 1 persistence verification is implemented; milestone 2 has not started. Transactional Outbox recovery and Prometheus/Grafana platform tests remain outside the first-release suite.
 
 ## Recorded milestone 0 result
 
 On 2026-07-16, `.\mvnw.cmd clean verify` ran 19 tests with 0 failures, 0 errors, and 0 skipped on JetBrains OpenJDK 17.0.14 while compiling with release 17. MockMvc covered `/api/v1/ping` and actual validation dispatch; focused tests covered safe binding responses, deterministic error ordering, and MDC cleanup. Both environment-check harnesses passed all six cases, and the Redis policy harness passed all five cases. The packaged application returned `UP` from `/actuator/health` and `SUCCESS` from `/api/v1/ping` on the same JDK. Docker-backed Compose validation confirmed all four milestone 0 services healthy and practically reachable after the credential-handling changes. An earlier JDK 25/release 21 run is historical only.
+
+## Recorded milestone 1 result
+
+On 2026-07-16, Java 17 ordinary verification ran 19 tests without Docker, and `clean verify -Pit` ran those 19 plus 20 MySQL persistence integration tests. Both runs had 0 failures, 0 errors, and 0 skipped tests. MySQL 8.4 containers were created and removed by Testcontainers; the local Compose database was not used by ITs.

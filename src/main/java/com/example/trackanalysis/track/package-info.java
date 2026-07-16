@@ -1,2 +1,2 @@
-/** Track-point parsing, persistence, and queries. Planned for milestone 4. */
+/** Track-point parsing, persistence, and query boundaries. */
 package com.example.trackanalysis.track;

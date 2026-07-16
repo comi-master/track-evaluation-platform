@@ -1,45 +1,66 @@
 # Database Design
 
-## Status
+## Implemented scope
 
-Milestone 1 has not started. There are no Flyway migrations, entities, mappers, executed SQL statements, or `EXPLAIN` results yet. This document records the proposed model only; it will be replaced with migration-backed evidence.
+Milestone 1 creates exactly two business tables through immutable Flyway migrations:
 
-## Proposed logical ER model
+- `V1__create_sys_user.sql`
+- `V2__create_dataset.sql`
+
+Flyway also owns `flyway_schema_history`. No role, file, track-point, analysis, task, interval, report, audit, or outbox table exists yet.
 
 ```mermaid
 erDiagram
-    SYS_USER ||--o{ SYS_USER_ROLE : has
-    SYS_ROLE ||--o{ SYS_USER_ROLE : grants
     SYS_USER ||--o{ DATASET : owns
-    DATASET ||--o{ DATASET_FILE : contains
-    DATASET_FILE ||--o{ TRACK_POINT : provides
-    DATASET ||--o{ ANALYSIS_TASK : requests
-    DATASET_FILE ||--o{ ANALYSIS_TASK : analyzes
-    ANALYSIS_TASK ||--|| ANALYSIS_RESULT : produces
-    ANALYSIS_TASK ||--o{ ABNORMAL_INTERVAL : detects
-    ANALYSIS_TASK ||--o{ ANALYSIS_REPORT : versions
-    SYS_USER ||--o{ OPERATION_LOG : performs
 ```
 
-Planned first-release tables are `sys_user`, `sys_role`, `sys_user_role`, `dataset`, `dataset_file`, `track_point`, `analysis_task`, `analysis_result`, `abnormal_interval`, `analysis_report`, and `operation_log`. Exact milestone 1 scope remains subject to its stage plan and user confirmation.
+## Common rules
 
-## Planned constraints and indexes
+- MySQL 8.4, InnoDB, `utf8mb4`, and `utf8mb4_0900_ai_ci`.
+- Signed `BIGINT AUTO_INCREMENT` identifiers mapped to Java `Long`.
+- `DATETIME(6)` stores UTC local date-time values; JDBC forces the session to `+00:00` and Java uses a UTC `Clock`.
+- Java `MetaObjectHandler` is the primary writer for `created_at` and `updated_at`. Database `CURRENT_TIMESTAMP(6)` defaults are insert fallbacks; `updated_at` has no database `ON UPDATE` clause.
+- `version` is the optimistic-lock counter and `deleted` is the `0/1` logical-delete flag.
+- No common BaseDO, `created_by`, or `updated_by` abstraction exists.
 
-- Unique usernames and role codes; unique `(user_id, role_id)` assignments.
-- Ownership query index on `dataset.user_id` and logical deletion status.
-- File metadata index on `dataset_file.dataset_id`; duplicate upload defense will use an ownership-aware business key after query design.
-- Track lookup indexes `(dataset_id, time_value)` and `(dataset_id, error_value)`; initial uniqueness candidate is `(file_id, time_value)` for the single-source/single-target format.
-- Unique task request ID and unique result task ID for idempotency defenses.
+## `sys_user`
 
-## Planned transaction boundaries
+| Column | Type | Null | Default | Purpose |
+| --- | --- | --- | --- | --- |
+| `id` | `BIGINT` | no | auto increment | primary key |
+| `username` | `VARCHAR(64)` | no | none | case-insensitive login name |
+| `password_hash` | `VARCHAR(255)` | no | none | encoded password only; authentication is not implemented |
+| `status` | `VARCHAR(16)` | no | `ACTIVE` | `ACTIVE` or `DISABLED` |
+| `version` | `INT UNSIGNED` | no | `0` | optimistic lock |
+| `deleted` | `TINYINT UNSIGNED` | no | `0` | logical deletion |
+| `created_at` | `DATETIME(6)` | no | current timestamp | UTC creation time |
+| `updated_at` | `DATETIME(6)` | no | current timestamp | UTC Java-managed update time |
 
-- Schema changes only through new immutable Flyway versions.
-- Batch track-point writes use explicit chunk/rollback semantics; no per-row transaction.
-- RabbitMQ publication and database state cannot be falsely described as one local transaction; milestone 5 will use bounded retry and basic idempotency within its approved first-release scope.
-- MinIO and MySQL cannot share a local transaction, so upload requires compensation and reconciliation rather than a false atomic claim.
+`uk_sys_user_username` permanently reserves a username even after logical deletion. CHECK constraints restrict `status` and `deleted`. There are no role tables.
 
-## Core SQL and EXPLAIN
+## `dataset`
 
-No core SQL exists yet, so no `EXPLAIN` result is claimed. Milestone 1 will document the exact select columns, predicates, fixtures, MySQL version, plan output, and why each index supports an observed access path.
+| Column | Type | Null | Default | Purpose |
+| --- | --- | --- | --- | --- |
+| `id` | `BIGINT` | no | auto increment | primary key |
+| `user_id` | `BIGINT` | no | none | owning `sys_user` |
+| `name` | `VARCHAR(128)` | no | none | display name; not unique |
+| `description` | `VARCHAR(500)` | yes | `NULL` | optional description |
+| `version` | `INT UNSIGNED` | no | `0` | optimistic lock |
+| `deleted` | `TINYINT UNSIGNED` | no | `0` | logical deletion |
+| `created_at` | `DATETIME(6)` | no | current timestamp | UTC creation time |
+| `updated_at` | `DATETIME(6)` | no | current timestamp | UTC Java-managed update time |
 
-Transactional Outbox is not part of the first-release schema or Definition of Done. It may be reconsidered only as a separately approved future extension. The former 0-12 roadmap that included an Outbox milestone is a historical plan, has been retired, and is not the current execution route.
+`fk_dataset_user` uses `ON UPDATE RESTRICT` and `ON DELETE RESTRICT`. `idx_dataset_owner_page (user_id, deleted, created_at DESC, id DESC)` supports owner-scoped active-dataset pagination ordered by newest creation time and ID. No redundant name or standalone owner index was added.
+
+## Verified behavior
+
+MySQL 8.4 Testcontainers verifies empty-schema migration, repeat migration, checksums, metadata, primary/unique/foreign/check constraints, NOT NULL behavior, index order, mapper insert/query/pagination, logical deletion, optimistic locking, UTC filling, test transaction rollback, and BlockAttack behavior.
+
+The integration suite executes the owner pagination SQL with `EXPLAIN` and asserts that a plan is returned. It deliberately does not assert the optimizer's selected access path on the tiny fixture and makes no performance claim.
+
+## Transactions and deferred schema
+
+Application-service public use cases will own `@Transactional`; controllers and mappers do not. Runtime exceptions roll back by default, checked exceptions require deliberate conversion or `rollbackFor`, and external MinIO/RabbitMQ calls must not be held inside long database transactions.
+
+`dataset_file`, `track_point`, analysis/task/result/interval tables, reports, roles, audit logs, and Outbox are deferred until their business milestones define real fields and query paths. Transactional Outbox remains outside the first release.

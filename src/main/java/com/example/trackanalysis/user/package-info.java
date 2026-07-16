@@ -1,2 +1,2 @@
-/** User and role feature. Planned for milestones 1 and 2. */
+/** User identity, account state, and persistence boundaries. */
 package com.example.trackanalysis.user;

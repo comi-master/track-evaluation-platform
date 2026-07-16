@@ -1,6 +1,6 @@
 # Interview Evidence Notebook
 
-This file grows only from implemented and verified project evidence. The requested 60 multi-level question chains belong to milestone 12. Milestone 0 records a small architecture baseline and does not claim later business experience.
+This file grows only from implemented and verified project evidence. Resume descriptions and interview Q&A are consolidated into milestone 6. Milestone 0 records a small architecture baseline and does not claim later business experience. The former 0-12 route is a historical plan, has been retired, and is not the current execution route.
 
 ## Why a modular monolith instead of microservices?
 
@@ -32,8 +32,18 @@ This file grows only from implemented and verified project evidence. The request
 
 **First follow-up — what is defined now?** Compose describes MySQL, Redis, RabbitMQ, and MinIO for repeatable local dependencies, but application clients are absent.
 
-**Second follow-up — when are clients added?** MySQL in milestone 1, Redis authentication use in milestone 2, MinIO in milestone 3, RabbitMQ in milestone 6, and result caching in milestone 8.
+**Second follow-up — when are clients added?** MySQL in milestone 1, security and dataset behavior in milestone 2, MinIO in milestone 3, and RabbitMQ plus Redis result caching in milestone 5.
 
 **Third follow-up — how does this help testing?** Each new adapter arrives with focused Testcontainers behavior and a documented outage/degradation path.
 
 **Project evidence:** `pom.xml` contains no later SDKs, while `PLANS.md` orders their introduction.
+
+## Why is Transactional Outbox absent from the first release?
+
+**Base answer:** The first release prioritizes a complete, demonstrable business workflow. Milestone 5 still requires bounded retries, a DLQ, manual ACK, and basic idempotency, while Outbox complexity is deferred until a separately approved reliability extension.
+
+**First follow-up — does that make database and broker publication atomic?** No. The project must state that limitation honestly and must not claim atomic cross-system delivery.
+
+**Second follow-up — when should Outbox be reconsidered?** When verified delivery-risk requirements justify its extra schema, publisher, recovery, monitoring, and duplicate-handling costs.
+
+**Project evidence:** the active scope in `PLANS.md` and ADR 0003. This is a planning decision, not evidence that messaging has already been implemented.

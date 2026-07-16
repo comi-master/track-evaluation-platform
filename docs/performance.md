@@ -6,7 +6,7 @@ No benchmark has been executed. There are no parsing, insertion, analysis, memor
 
 ## Planned environment record
 
-Milestone 10 will record the exact commit, JDK, Maven, OS, CPU, memory, MySQL version/configuration, container resources, JVM options, batch size, file size, row count, warm-up, repetitions, and statistic used.
+Milestone 6 will record the exact commit, JDK, Maven, OS, CPU, memory, MySQL version/configuration, container resources, JVM options, batch size, file size, row count, warm-up, repetitions, and statistic used for each basic measurement actually performed.
 
 ## Planned datasets and method
 
@@ -14,7 +14,7 @@ Milestone 10 will record the exact commit, JDK, Maven, OS, CPU, memory, MySQL ve
 - Compare single inserts with batches of 200, 500, and 1,000 on the same machine and data.
 - Separate parse, database, analysis, and total duration; approximate peak memory and batch count.
 - Run warm-up and multiple measured repetitions, reporting median or clearly labeled mean.
-- Compare cache hit/miss and offset/deep/cursor pagination only after those implementations exist.
+- Compare only implemented paths. Cache hit/miss or pagination comparisons are optional unless the milestone 6 plan explicitly includes them.
 
 ## Results
 
@@ -22,4 +22,6 @@ Pending. Empty by design to prevent invented measurements.
 
 ## Query plans and limitations
 
-Pending milestone 1/10 real `EXPLAIN` evidence. Any future conclusion must retain environment and measurement limitations.
+Pending milestone 1 query-plan evidence and milestone 6 basic performance measurements. Any future conclusion must retain environment and measurement limitations.
+
+The active route has seven milestones numbered 0-6. The former dedicated performance milestone in the 0-12 route is a historical plan, has been retired, and is not the current execution route. No performance result is claimed until it is measured.

@@ -5,7 +5,7 @@ This file is the operating contract for contributors and coding agents. Read it 
 ## Project structure
 
 - `src/main/java/com/example/trackanalysis/common`: cross-cutting API, exception, logging, validation, security, configuration, and small stateless utilities.
-- `src/main/java/com/example/trackanalysis/<feature>`: package-by-feature modules (`auth`, `user`, `dataset`, `storage`, `track`, `analysis`, `task`, `report`, `audit`, `messaging`, and `outbox`).
+- `src/main/java/com/example/trackanalysis/<feature>`: package-by-feature modules (`auth`, `user`, `dataset`, `storage`, `track`, `analysis`, `task`, `report`, `audit`, and `messaging`). A legacy `outbox` placeholder may remain from the retired roadmap, but Transactional Outbox is outside the first release unless separately approved.
 - A feature may contain `controller`, `application`, `domain`, `infrastructure`, `dto`, `vo`, `converter`, and `mapper` only when the layer has real code.
 - `src/main/resources`: Spring configuration and, from milestone 1 onward, Flyway migrations and MyBatis XML.
 - `src/test`: mirrors production packages. Pure unit tests end in `Test`; container-backed tests end in `IT`.
@@ -84,6 +84,7 @@ For local acceptance, never print resolved Compose configuration or `.env` value
 
 ## Forbidden actions
 
+- The only active roadmap has seven milestones numbered 0-6. Milestone 0 is complete and milestone 1 is next but not started; the former 0-12 route is a historical plan, has been retired, and is not the current execution route.
 - Do not jump ahead of the active milestone or claim unfinished features.
 - Do not introduce a middleware SDK without documenting its problem, cost, test strategy, and degradation path.
 - Do not commit secrets, generated build output, benchmark claims without measurements, or resume claims without code/test evidence.
@@ -92,4 +93,4 @@ For local acceptance, never print resolved Compose configuration or `.env` value
 
 ## Definition of Done
 
-A milestone is done only when its acceptance conditions in `PLANS.md` are met and recorded honestly: code compiles, relevant unit and integration tests run, `spotless:check` passes, `git diff` is reviewed, documentation is synchronized, and unresolved environmental or technical risks are explicit. The whole project is done only after all 28 project-level conditions in `PLANS.md` are verified; completion of an early milestone is not completion of the product.
+A milestone follows the unified workflow in `PLANS.md`: plan, user scope confirmation, implementation, tests and `clean verify`, necessary Docker/integration acceptance, one independent review, fixes for substantiated High and Medium findings, commit, then explicit continuation. A milestone is done only when its acceptance conditions are recorded honestly. The whole first release is done only after milestones 0-6 are verified; Transactional Outbox and complex monitoring platforms are not first-release completion conditions.

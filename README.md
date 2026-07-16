@@ -2,7 +2,7 @@
 
 `track-analysis-platform` 是一个面向 Java 后端工程实践的模块化单体项目。目标业务闭环是：安全地接收七列航迹 CSV，流式解析和批量入库，异步计算三维误差与连续异常区间，并管理分析结果和模板报告。
 
-> 当前状态：里程碑 0（规划与可运行骨架）已完成真实环境验收。项目以 Java 17 为当前统一基线；19 个测试、应用烟测和四个 Compose 服务的健康及实际可用性检查均已通过。数据库业务表、认证、上传、分析、消息、缓存和报告业务仍未实现，必须等待明确指令后才能进入里程碑 1。
+> 当前状态：唯一有效路线共七个里程碑（0—6）。里程碑 0（工程骨架与开发环境）已完成真实环境验收，里程碑 1 是下一阶段但尚未开始。项目以 Java 17 为当前统一基线；19 个测试、应用烟测和四个 Compose 服务的健康及实际可用性检查均已通过。数据库业务表、认证、上传、分析、消息、缓存和报告业务仍未实现。
 
 ## 当前功能
 
@@ -36,7 +36,7 @@ The current code only contains `common` and empty feature package boundaries. Se
 
 ## Core target flow
 
-Register/login → create dataset → stream CSV to MinIO → create analysis task and Outbox event → publish to RabbitMQ → stream parse and batch insert → compute metrics/intervals → cache result → generate template report.
+Register/login → create dataset → stream and parse CSV with raw storage in MinIO → batch insert track points → synchronously compute and query metrics/intervals → add RabbitMQ asynchronous execution and Redis result cache → generate template report.
 
 This flow is a roadmap, not a statement of currently completed functionality.
 
@@ -89,7 +89,7 @@ All middleware ports bind to `127.0.0.1` by default through `BIND_ADDRESS`. Over
 
 ## API documentation
 
-The implemented endpoint contract is in [docs/api.md](docs/api.md). Interactive OpenAPI is planned for milestone 11 and is not currently available.
+The implemented endpoint contract is in [docs/api.md](docs/api.md). Interactive OpenAPI is planned for milestone 6 and is not currently available.
 
 ## Demo account initialization
 
@@ -132,7 +132,7 @@ bash ./scripts/test-redis-password-policy.sh
 
 ## Performance summary
 
-No performance measurements exist yet. Benchmarks and honest same-machine comparisons belong to milestone 10; [docs/performance.md](docs/performance.md) intentionally contains no invented numbers.
+No performance measurements exist yet. Basic, honest same-machine measurements belong to milestone 6; [docs/performance.md](docs/performance.md) intentionally contains no invented numbers.
 
 ## Troubleshooting
 
@@ -144,11 +144,11 @@ No performance measurements exist yet. Benchmarks and honest same-machine compar
 
 ## Known limitations
 
-- Milestones 1-12 are pending; this is not yet the full business product.
+- Milestones 1-6 are pending; this is not yet the full business product.
 - The Maven Wrapper works without global Maven. The supported and verified runtime is JDK 17; an installed JDK 25 is not used by the project acceptance workflow.
 - Compose services are infrastructure-only in milestone 0. The Spring Boot application deliberately has no business integration with them yet.
 - Docker Hub can occasionally return a transient `EOF`; use a finite retry and inspect Docker Desktop proxy/network settings if it persists.
-- Prometheus and Grafana containers are intentionally deferred to observability milestone 9.
+- A Prometheus/Grafana monitoring platform is outside the first release. Existing Actuator/Micrometer endpoint support does not mean that platform has been implemented.
 
 Inspect the already configured infrastructure with:
 
@@ -162,4 +162,4 @@ Do not use `docker compose down -v` unless deleting all local dependency data is
 
 ## Roadmap
 
-The ordered roadmap is maintained in [PLANS.md](PLANS.md): database → authentication → datasets/storage → CSV ingestion → synchronous analysis → RabbitMQ → Outbox → cache/rate limit → observability → performance → engineering closeout → resume/interview evidence.
+The only active roadmap is maintained in [PLANS.md](PLANS.md) and contains milestones 0-6: foundation → database/persistence → authentication and dataset management → CSV/MinIO/streaming ingestion → complete synchronous analysis closure → RabbitMQ async tasks and Redis cache → reports/testing/delivery/interview material. The former 0-12 route is a historical plan, has been retired, and is not the current execution route. Transactional Outbox and complex monitoring platforms are future extensions, not first-release requirements.

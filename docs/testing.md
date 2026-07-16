@@ -34,11 +34,15 @@ The default suite must not need manually running infrastructure. Container-backe
 ## Failure scenarios by roadmap
 
 - Milestone 1: migration, mapper SQL, rollback, uniqueness, optimistic/conditional updates.
-- Milestones 2-3: duplicate user, bad password, expired token, ownership denial, invalid/empty file, MinIO/database partial failure.
-- Milestones 4-5: BOM/header/column/numeric/NaN/infinity/duplicate-time failures; RMSE distinction and interval boundaries.
-- Milestones 6-8: duplicate MQ delivery, consumer failure, retry exhaustion, RabbitMQ/Redis outage, Outbox recovery, cache invalidation.
+- Milestone 2: duplicate user, bad password, expired token, ownership denial, pagination and search boundaries.
+- Milestone 3: invalid/empty file, BOM/header/column/numeric/NaN/infinity/duplicate-time failures, MinIO/database partial failure, and batch rollback.
+- Milestone 4: RMSE distinction, extrema/standard deviation, abnormal-point and interval boundaries, multi-source comparison, and synchronous workflow integration.
+- Milestone 5: duplicate MQ delivery, consumer failure, retry exhaustion, RabbitMQ/Redis outage, legal task-state transitions, and cache invalidation.
+- Milestone 6: report history, OpenAPI/image/demo acceptance, necessary end-to-end integration, and reproducible basic performance measurement.
 
 No later failure scenario is marked tested until its test has actually run.
+
+The active test route follows milestones 0-6; milestone 0 is complete and milestone 1 is next but has not started. Transactional Outbox recovery and Prometheus/Grafana platform tests are outside the first-release suite unless separately approved. The former 0-12 route is a historical plan, has been retired, and is not the current execution route.
 
 ## Recorded milestone 0 result
 

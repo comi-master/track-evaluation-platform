@@ -36,6 +36,7 @@ class DatabaseConstraintIT extends MySqlIntegrationTestSupport {
             "username",
             "password_hash",
             "status",
+            "auth_version",
             "version",
             "deleted",
             "created_at",
@@ -44,6 +45,7 @@ class DatabaseConstraintIT extends MySqlIntegrationTestSupport {
     assertColumn(userColumns, "username", "varchar(64)", "NO", null);
     assertColumn(userColumns, "password_hash", "varchar(255)", "NO", null);
     assertColumn(userColumns, "status", "varchar(16)", "NO", "ACTIVE");
+    assertColumn(userColumns, "auth_version", "int unsigned", "NO", "0");
     assertColumn(userColumns, "version", "int unsigned", "NO", "0");
     assertColumn(userColumns, "deleted", "tinyint unsigned", "NO", "0");
     assertColumn(userColumns, "created_at", "datetime(6)", "NO", "CURRENT_TIMESTAMP(6)");

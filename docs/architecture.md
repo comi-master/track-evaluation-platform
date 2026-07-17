@@ -1,18 +1,23 @@
 # Architecture
 
-## Current milestone 1
+## Current milestone 2
 
-The application remains one Spring Boot process. Cross-cutting HTTP behavior now coexists with a MySQL persistence foundation for users and datasets. Flyway owns schema versions, while feature-local MyBatis-Plus mappers own persistence mapping. No authentication, dataset use case, upload, analysis, messaging, cache, report, or production XML mapper exists yet.
+The application remains one Spring Boot process. Spring Security authenticates one signed JWT Access Token, reloads the current user for every protected request, and rejects deleted, disabled, or invalidated accounts. Application services own transactions; feature-local MyBatis-Plus mappers include ownership in dataset SQL. No Refresh Token, Redis login state, RBAC, upload, analysis, messaging, cache, report, or production XML mapper exists.
 
 ```mermaid
 flowchart TD
     Request["HTTP request"] --> RequestId["RequestIdFilter"]
-    RequestId --> Ping["PingController"]
-    Ping --> Result["Result<T>"]
+    RequestId --> Security["JWT filter / SecurityContext"]
+    Security --> Auth["auth application service"]
+    Security --> Dataset["dataset application service"]
+    Auth --> UserMapper["sys_user mapper"]
+    Dataset --> DatasetMapper["owner-scoped dataset mapper"]
+    Auth --> Result["Result<T>"]
+    Dataset --> Result
     Error["Exception"] --> Handler["GlobalExceptionHandler"]
     Handler --> Result
     Actuator["Spring Boot Actuator"] --> Health["health / info / metrics / prometheus"]
-    Flyway["Flyway V1/V2"] --> MySQL["MySQL: sys_user / dataset"]
+    Flyway["Flyway V1/V2/V3"] --> MySQL["MySQL: sys_user / dataset"]
     UserMapper["user persistence mapper"] --> MySQL
     DatasetMapper["dataset persistence mapper"] --> MySQL
 ```
@@ -76,13 +81,13 @@ This sequence will be introduced incrementally: database persistence in mileston
 
 Result queries use cache-aside: Redis hit returns a JSON value; a miss reads MySQL and fills a bounded-TTL entry. Task completion commits MySQL first and invalidates the old key. Redis outage should degrade result queries to MySQL. This is planned for milestone 5; complex rate limiting is outside the first release.
 
-## Target authorization flow
+## Implemented authorization flow
 
-Spring Security authenticates an access token, builds the security context, and application queries include the current user ID when loading owned resources. Administrators use explicit roles. Returning 404 for inaccessible owned resources may reduce enumeration while 401 and 403 remain semantically distinct. This is planned for milestone 2.
+Spring Security runs statelessly with CSRF, form login and HTTP Basic disabled. The JWT filter verifies signature, issuer and expiry, then loads `sys_user` and compares `authVersion` before building an immutable principal. Logout atomically increments `auth_version`, invalidating every previously issued token for that user. Dataset reads, writes and deletes require `(dataset.id, current user_id, deleted = 0)` in Mapper SQL; inaccessible resources return 404. There is one ordinary-user role only and no RBAC table.
 
 ## Delivery boundary
 
-The active route contains seven milestones numbered 0-6. Milestone 0 is complete and milestone 1 persistence acceptance has passed; milestone 2 has not started. The first release remains a modular monolith and prioritizes a demonstrable upload-analysis-report business closure over infrastructure breadth. The former 0-12 route is historical. Transactional Outbox, microservice decomposition, and a Prometheus/Grafana platform are future extensions only.
+The active route contains seven milestones numbered 0-6. Milestones 0, 1 and 2 are complete; milestone 3 has not started. The first release remains a modular monolith and prioritizes a demonstrable upload-analysis-report business closure over infrastructure breadth. The former 0-12 route is historical. Transactional Outbox, microservice decomposition, and a Prometheus/Grafana platform are future extensions only.
 
 ## Dependency rules
 

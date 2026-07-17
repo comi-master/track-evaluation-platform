@@ -29,6 +29,7 @@ class SysUserMapperIT extends MySqlIntegrationTestSupport {
 
     SysUserDO stored = userMapper.selectById(user.getId());
     assertThat(stored.getUsername()).isEqualTo("mapper-user");
+    assertThat(stored.getAuthVersion()).isZero();
     assertThat(stored.getVersion()).isZero();
     assertThat(stored.getDeleted()).isZero();
   }
@@ -86,6 +87,7 @@ class SysUserMapperIT extends MySqlIntegrationTestSupport {
     copy.setUsername(source.getUsername());
     copy.setPasswordHash(source.getPasswordHash());
     copy.setStatus(source.getStatus());
+    copy.setAuthVersion(source.getAuthVersion());
     copy.setVersion(source.getVersion());
     copy.setDeleted(source.getDeleted());
     copy.setCreatedAt(source.getCreatedAt());

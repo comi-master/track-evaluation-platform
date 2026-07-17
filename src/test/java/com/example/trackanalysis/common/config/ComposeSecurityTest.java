@@ -31,4 +31,13 @@ class ComposeSecurityTest {
         .contains("./docker/redis/entrypoint.sh:/usr/local/bin/track-redis-entrypoint.sh:ro")
         .doesNotContain("printf 'requirepass %s\\n' \"$${REDIS_PASSWORD}\"");
   }
+
+  @Test
+  void productionMyBatisLoggingCannotPrintPasswordHashes() throws IOException {
+    String application = Files.readString(Path.of("src/main/resources/application.yml"));
+
+    assertThat(application)
+        .contains("log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl")
+        .doesNotContain("log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl");
+  }
 }

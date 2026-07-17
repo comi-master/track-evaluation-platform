@@ -18,6 +18,7 @@ public class SysUserDO {
   private String username;
   private String passwordHash;
   private String status;
+  private Integer authVersion;
 
   @Version private Integer version;
 
@@ -59,6 +60,14 @@ public class SysUserDO {
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  public Integer getAuthVersion() {
+    return authVersion;
+  }
+
+  public void setAuthVersion(Integer authVersion) {
+    this.authVersion = authVersion;
   }
 
   public Integer getVersion() {

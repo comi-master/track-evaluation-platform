@@ -24,6 +24,29 @@ Returns HTTP 200 and a success envelope containing `status`, `application`, and 
 
 Configured endpoints are `/actuator/health`, `/actuator/info`, `/actuator/metrics`, and `/actuator/prometheus`. Health details are not exposed. Production exposure/network policy will be hardened when security and deployment profiles exist.
 
+### Authentication
+
+- `POST /api/v1/auth/register` creates a normalized lowercase user and returns public user fields only (201).
+- `POST /api/v1/auth/login` returns a Bearer Access Token, expiry seconds, and public user fields (200).
+- `GET /api/v1/auth/me` returns the authenticated user's public fields (200).
+- `POST /api/v1/auth/logout` increments `sys_user.auth_version` (200). This invalidates every token previously issued to that user, not only one device.
+
+Usernames are 3-64 lowercase-normalized ASCII letters, digits, dot, underscore, or hyphen. Passwords are 8-64 characters and are stored only as BCrypt hashes. Unknown user and wrong password use the same public 401 response.
+
+### Datasets
+
+- `POST /api/v1/datasets` creates an owned dataset (201).
+- `GET /api/v1/datasets/{id}` reads an owned active dataset (200).
+- `GET /api/v1/datasets?page=1&size=20&keyword=` returns an owner-scoped page ordered by `created_at DESC, id DESC` (200); size is capped at 100.
+- `PUT /api/v1/datasets/{id}` updates name/description using the request `version` (200); stale versions return 409.
+- `DELETE /api/v1/datasets/{id}` performs a logical delete (200).
+
+All dataset SQL includes the current `user_id` and `deleted = 0`. Another user's resource and an absent resource both return 404.
+
+### OpenAPI
+
+`/v3/api-docs` and `/swagger-ui.html` are public. Protected operations declare the HTTP Bearer JWT scheme.
+
 ## Error mapping
 
 | Business code | HTTP status | Meaning |
@@ -38,4 +61,4 @@ Configured endpoints are `/actuator/health`, `/actuator/info`, `/actuator/metric
 | `INFRASTRUCTURE_ERROR` | 503 | Required dependency unavailable |
 | `INTERNAL_ERROR` | 500 | Safe generic response; full cause stays in logs |
 
-Only ping and Actuator exist now. Authentication, datasets, files, tasks, points, results, intervals, and reports listed in the product brief are planned for later milestones and must not be treated as available APIs.
+Ping, Actuator, authentication, datasets and OpenAPI are implemented. Files, tasks, points, analysis results, intervals and reports are planned for later milestones and must not be treated as available APIs. There is no Refresh Token, Redis login state or RBAC API.

@@ -2,10 +2,11 @@
 
 ## Implemented scope
 
-Milestone 1 creates exactly two business tables through immutable Flyway migrations:
+Milestones 1 and 2 still contain exactly two business tables through immutable Flyway migrations:
 
 - `V1__create_sys_user.sql`
 - `V2__create_dataset.sql`
+- `V3__add_user_auth_version.sql`
 
 Flyway also owns `flyway_schema_history`. No role, file, track-point, analysis, task, interval, report, audit, or outbox table exists yet.
 
@@ -29,8 +30,9 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | `id` | `BIGINT` | no | auto increment | primary key |
 | `username` | `VARCHAR(64)` | no | none | case-insensitive login name |
-| `password_hash` | `VARCHAR(255)` | no | none | encoded password only; authentication is not implemented |
+| `password_hash` | `VARCHAR(255)` | no | none | BCrypt hash only |
 | `status` | `VARCHAR(16)` | no | `ACTIVE` | `ACTIVE` or `DISABLED` |
+| `auth_version` | `INT UNSIGNED` | no | `0` | invalidates all older JWTs when incremented |
 | `version` | `INT UNSIGNED` | no | `0` | optimistic lock |
 | `deleted` | `TINYINT UNSIGNED` | no | `0` | logical deletion |
 | `created_at` | `DATETIME(6)` | no | current timestamp | UTC creation time |
@@ -55,12 +57,12 @@ erDiagram
 
 ## Verified behavior
 
-MySQL 8.4 Testcontainers verifies empty-schema migration, repeat migration, checksums, metadata, primary/unique/foreign/check constraints, NOT NULL behavior, index order, mapper insert/query/pagination, logical deletion, optimistic locking, UTC filling, test transaction rollback, and BlockAttack behavior.
+MySQL 8.4 Testcontainers verifies empty-schema V1-V3 migration, v2-to-v3 forward upgrade, repeat migration, checksums, `auth_version` default/NOT NULL behavior, primary/unique/foreign/check constraints, index order, authentication/logout behavior, owner-scoped dataset CRUD/pagination/search, logical deletion, optimistic locking, UTC filling, test transaction rollback, and BlockAttack behavior.
 
 The integration suite executes the owner pagination SQL with `EXPLAIN` and asserts that a plan is returned. It deliberately does not assert the optimizer's selected access path on the tiny fixture and makes no performance claim.
 
 ## Transactions and deferred schema
 
-Application-service public use cases will own `@Transactional`; controllers and mappers do not. Runtime exceptions roll back by default, checked exceptions require deliberate conversion or `rollbackFor`, and external MinIO/RabbitMQ calls must not be held inside long database transactions.
+Application-service public use cases own `@Transactional`; controllers and mappers do not. Runtime exceptions roll back by default, checked exceptions require deliberate conversion or `rollbackFor`, and external MinIO/RabbitMQ calls must not be held inside long database transactions.
 
 `dataset_file`, `track_point`, analysis/task/result/interval tables, reports, roles, audit logs, and Outbox are deferred until their business milestones define real fields and query paths. Transactional Outbox remains outside the first release.

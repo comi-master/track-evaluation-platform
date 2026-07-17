@@ -1,6 +1,9 @@
 spring:
   application:
     name: track-analysis-platform
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   lifecycle:
     timeout-per-shutdown-phase: 20s
   datasource:
@@ -18,11 +21,17 @@ spring:
     clean-disabled: true
     out-of-order: false
 
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    issuer: ${JWT_ISSUER:track-analysis-platform}
+    access-ttl-minutes: ${JWT_ACCESS_TTL_MINUTES:120}
+
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
   global-config:
     db-config:
       id-type: auto
@@ -54,7 +63,7 @@ management:
 info:
   application:
     name: ${spring.application.name}
-    milestone: 1
+    milestone: 2
 
 logging:
   pattern:

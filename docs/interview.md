@@ -58,4 +58,18 @@ This file grows only from implemented and verified project evidence. Resume desc
 
 **Third follow-up — why only two tables?** `sys_user` and `dataset` are the immediate persistence prerequisites. File, track, analysis, report, role, audit, and Outbox tables wait until their business rules and access paths are known.
 
-**Project evidence:** Flyway V1/V2, feature-local DO/Mapper classes, and the four persistence `*IT` suites. There are still no authentication or dataset HTTP use cases.
+**Project evidence:** Flyway V1/V2, feature-local DO/Mapper classes, and the persistence `*IT` suites. Milestone 2 builds authentication and owner-scoped dataset HTTP use cases on this foundation.
+
+## Milestone 2: Why use JWT plus `auth_version`?
+
+**Base answer:** A self-contained JWT alone cannot provide immediate logout before expiry. Each protected request therefore verifies the token cryptographically and compares its `authVersion` claim with `sys_user.auth_version`; logout increments the database value so every older token becomes invalid.
+
+**First follow-up — why not Redis?** The current modular monolith prioritizes a clear revocation contract over avoiding one indexed user lookup. Redis login state, blacklists and Refresh Tokens add lifecycle and failure modes that milestone 2 does not need.
+
+**Second follow-up — what is the logout tradeoff?** Logout is global for that user, not device-specific. It invalidates all previously issued tokens. This behavior is explicit in the API and ADR rather than being presented as per-device session management.
+
+**Third follow-up — how is IDOR prevented?** Dataset Mapper statements include the resource ID, authenticated owner ID and `deleted = 0` in the same SQL condition. The application never loads by ID and checks ownership later, and inaccessible resources consistently return 404.
+
+**Fourth follow-up — how are concurrent edits handled?** Updates require the client-visible `version` and condition on it in SQL. A zero-row update is distinguished from invisibility: an existing owned resource produces 409 for a stale version, while an absent or foreign resource produces 404.
+
+**Project evidence:** `JwtAuthenticationFilter`, `JwtService`, `AuthApplicationService`, owner-scoped `DatasetMapper` SQL, V3 migration, ordinary security/service tests, and MySQL 8.4 API integration tests.

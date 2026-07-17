@@ -30,7 +30,7 @@ bash ./scripts/test-redis-password-policy.sh
 
 Run `./scripts/test-check-environment.sh` from a POSIX shell for the equivalent script regression suite. Run `./scripts/test-redis-password-policy.sh` to verify the Redis entrypoint policy without starting a container.
 
-The default suite runs 19 ordinary tests and does not activate Failsafe or Testcontainers. The `it` profile binds Failsafe to `*IT`, requires Docker, and runs an isolated MySQL 8.4 container. Docker unavailability fails `-Pit` explicitly; it is never converted to a skipped test.
+The default suite runs ordinary tests and does not activate Failsafe or Testcontainers. The `it` profile binds Failsafe to `*IT`, requires Docker, and runs isolated MySQL 8.4 containers. Docker unavailability fails `-Pit` explicitly; it is never converted to a skipped test.
 
 ## Milestone 1 persistence suite
 
@@ -40,6 +40,13 @@ The default suite runs 19 ordinary tests and does not activate Failsafe or Testc
 - `DatasetMapperIT`: owner relation, pagination and stable ordering, logical delete, owner isolation, optimistic lock, executable `EXPLAIN`.
 
 Every IT uses a JUnit-managed Testcontainer with independent credentials and database. Class-level Spring transactions roll back fixtures, contexts and containers close after each class, and no test reads the local Compose datasource.
+
+## Milestone 2 authentication and dataset suite
+
+- Pure and Mockito tests cover username normalization/validation, request validation, BCrypt orchestration, JWT signature/issuer/expiry, JSON 401/403 handlers, filter branches, ownership and optimistic-conflict translation.
+- `V2ToV3MigrationIT` verifies a real v2 schema upgrades to v3 and that `auth_version` is NOT NULL with default zero.
+- `AuthenticationApiIT` verifies registration normalization, permanent uniqueness, BCrypt storage, uniform login failures, disabled users, protected API access, invalid/expired JWTs, logout invalidation, and OpenAPI exposure.
+- `DatasetApiIT` verifies authenticated CRUD, fixed pagination order, bounded keyword search, logical deletion, optimistic conflict, and 404 owner isolation for read/update/delete.
 
 ## Failure scenarios by roadmap
 
@@ -52,7 +59,7 @@ Every IT uses a JUnit-managed Testcontainer with independent credentials and dat
 
 No later failure scenario is marked tested until its test has actually run.
 
-The active test route follows milestones 0-6. Milestone 1 persistence verification is implemented; milestone 2 has not started. Transactional Outbox recovery and Prometheus/Grafana platform tests remain outside the first-release suite.
+The active test route follows milestones 0-6. Milestone 2 verification is complete; milestone 3 has not started. Transactional Outbox recovery and Prometheus/Grafana platform tests remain outside the first-release suite.
 
 ## Recorded milestone 0 result
 
@@ -61,3 +68,7 @@ On 2026-07-16, `.\mvnw.cmd clean verify` ran 19 tests with 0 failures, 0 errors,
 ## Recorded milestone 1 result
 
 On 2026-07-16, Java 17 ordinary verification ran 19 tests without Docker, and `clean verify -Pit` ran those 19 plus 20 MySQL persistence integration tests. Both runs had 0 failures, 0 errors, and 0 skipped tests. MySQL 8.4 containers were created and removed by Testcontainers; the local Compose database was not used by ITs.
+
+## Recorded milestone 2 result
+
+On 2026-07-17, Java 17 ordinary verification ran 49 tests without Docker. After independent-review fixes, `clean verify -Pit` ran those 49 ordinary tests plus 31 MySQL 8.4 integration tests; both layers had 0 failures, 0 errors, and 0 skipped tests. Testcontainers were removed after execution and did not use the local Compose database. The post-review Compose smoke test passed registration, login, current user, dataset create/read/update/page, logout invalidation, health, request ID equality, sensitive-log scanning, and process shutdown.

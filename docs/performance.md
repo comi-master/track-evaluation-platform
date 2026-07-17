@@ -27,3 +27,5 @@ The milestone 1 integration suite executed `EXPLAIN` for owner-scoped active-dat
 The active route has seven milestones numbered 0-6. The former dedicated performance milestone in the 0-12 route is a historical plan, has been retired, and is not the current execution route. No performance result is claimed until it is measured.
 
 Milestone 4 bounds analysis memory with configurable 1,000-point keyset batches (`sequence_no > cursor`, ascending, limited). Welford statistics and current interval state are streaming; completed intervals are retained only until the short batch insert. This is a design property, not a latency, throughput, or peak-memory measurement.
+
+Milestone 5 moves long analysis work off the request thread but makes no throughput claim. RabbitMQ prefetch/concurrency remain conservative defaults, retries are bounded and delayed, and messages carry only a version plus task ID. Redis caches only the two repeated summary queries with 10-minute/5-minute TTLs. These are bounded design choices; no cache hit-rate, latency or messages-per-second number is claimed without a recorded benchmark.

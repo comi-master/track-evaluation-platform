@@ -24,7 +24,7 @@ class V3ToV5MigrationIT {
           .withPassword(UUID.randomUUID().toString());
 
   @Test
-  void upgradesV5DataToV7WithoutChangingExistingTrackData() {
+  void upgradesV5DataToV8WithoutChangingExistingTrackData() {
     Flyway.configure()
         .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
         .target(MigrationVersion.fromVersion("5"))
@@ -81,9 +81,9 @@ class V3ToV5MigrationIT {
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND"
                     + " table_name IN"
-                    + " ('track_file','track_point','analysis_result','abnormal_interval')",
+                    + " ('track_file','track_point','analysis_result','abnormal_interval','analysis_task')",
                 Integer.class))
-        .isEqualTo(4);
+        .isEqualTo(5);
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM track_point WHERE track_file_id = ?", Integer.class, fileId))

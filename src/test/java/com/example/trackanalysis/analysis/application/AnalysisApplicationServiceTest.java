@@ -23,6 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,7 @@ class AnalysisApplicationServiceTest {
   @Mock AbnormalIntervalMapper intervals;
   @Mock TransactionTemplate transactions;
   @Mock DatasetMapper datasets;
+  @Mock AnalysisCacheService cache;
   AnalysisApplicationService service;
 
   @BeforeEach
@@ -56,7 +58,9 @@ class AnalysisApplicationServiceTest {
             transactions,
             Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
             new AnalysisProperties(2),
-            datasets);
+            datasets,
+            cache);
+    when(cache.latest(anyLong(), anyLong())).thenReturn(Optional.empty());
     doAnswer(
             invocation ->
                 ((TransactionCallback<?>) invocation.getArgument(0)).doInTransaction(null))
@@ -198,6 +202,7 @@ class AnalysisApplicationServiceTest {
   private void ownedParsed() {
     TrackFileDO file = new TrackFileDO();
     file.setId(7L);
+    file.setDatasetId(3L);
     file.setParseStatus(ParseStatus.PARSED);
     when(files.selectOwnedById(7, 5)).thenReturn(file);
   }

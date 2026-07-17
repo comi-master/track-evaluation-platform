@@ -9,6 +9,7 @@ import com.example.trackanalysis.track.domain.ParseStatus;
 import com.example.trackanalysis.track.infrastructure.persistence.*;
 import java.time.*;
 import java.util.*;
+import java.util.function.LongConsumer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -22,6 +23,7 @@ public class AnalysisApplicationService {
   private final Clock clock;
   private final AnalysisProperties props;
   private final DatasetMapper datasets;
+  private final AnalysisCacheService cache;
 
   public AnalysisApplicationService(
       TrackFileMapper files,
@@ -31,7 +33,8 @@ public class AnalysisApplicationService {
       TransactionTemplate tx,
       Clock clock,
       AnalysisProperties props,
-      DatasetMapper datasets) {
+      DatasetMapper datasets,
+      AnalysisCacheService cache) {
     this.files = files;
     this.points = points;
     this.results = results;
@@ -40,6 +43,7 @@ public class AnalysisApplicationService {
     this.clock = clock;
     this.props = props;
     this.datasets = datasets;
+    this.cache = cache;
   }
 
   public AnalysisResponse create(long user, long file, double threshold) {
@@ -48,6 +52,21 @@ public class AnalysisApplicationService {
     TrackFileDO f = owned(user, file);
     if (f.getParseStatus() != ParseStatus.PARSED)
       throw new BusinessException(ErrorCode.CONFLICT, "Track file must be parsed");
+    AnalysisResponse response = execute(file, threshold, ignored -> {});
+    cache.evict(user, file, f.getDatasetId());
+    return response;
+  }
+
+  public AnalysisResponse createForTask(long file, double threshold, LongConsumer completion) {
+    if (!Double.isFinite(threshold) || threshold < 0)
+      throw bad("Threshold must be finite and non-negative");
+    TrackFileDO trackFile = files.selectById(file);
+    if (trackFile == null || trackFile.getParseStatus() != ParseStatus.PARSED)
+      throw new BusinessException(ErrorCode.CONFLICT, "Track file must be parsed");
+    return execute(file, threshold, completion);
+  }
+
+  private AnalysisResponse execute(long file, double threshold, LongConsumer completion) {
     Computed c = compute(file, threshold);
     if (c.count == 0) throw new BusinessException(ErrorCode.CONFLICT, "Track file has no points");
     return tx.execute(
@@ -59,15 +78,20 @@ public class AnalysisApplicationService {
             i.setCreatedAt(r.getCreatedAt());
           }
           if (!c.intervals.isEmpty()) intervals.batchInsert(c.intervals);
+          completion.accept(r.getId());
           return response(r, c.intervals);
         });
   }
 
   public AnalysisResponse latest(long user, long file) {
     owned(user, file);
+    var cached = cache.latest(user, file);
+    if (cached.isPresent()) return cached.get();
     AnalysisResultDO r = results.selectLatestOwned(file, user);
     if (r == null) throw notFound("Analysis result");
-    return response(r, intervals.selectOwnedByResult(r.getId(), user));
+    AnalysisResponse response = response(r, intervals.selectOwnedByResult(r.getId(), user));
+    cache.putLatest(user, file, response);
+    return response;
   }
 
   public AnalysisPageResponse history(long user, long file, int page, int size) {
@@ -103,28 +127,37 @@ public class AnalysisApplicationService {
 
   public List<DatasetAnalysisComparisonResponse> comparison(long user, long datasetId) {
     if (datasets.countOwnedActive(datasetId, user) == 0) throw notFound("Dataset");
-    return results.selectLatestByOwnedDataset(datasetId, user).stream()
-        .map(
-            r -> {
-              TrackFileDO file = files.selectOwnedById(r.getTrackFileId(), user);
-              return new DatasetAnalysisComparisonResponse(
-                  r.getTrackFileId(),
-                  file.getOriginalName(),
-                  file.getTrackSource(),
-                  r.getId(),
-                  r.getAbnormalThreshold(),
-                  r.getPointCount(),
-                  r.getMeanError(),
-                  r.getRmse(),
-                  r.getMinError(),
-                  r.getMaxError(),
-                  r.getStandardDeviation(),
-                  r.getAbnormalCount(),
-                  r.getAbnormalRatio(),
-                  r.getMaxErrorTime(),
-                  r.getCreatedAt());
-            })
-        .toList();
+    var cached = cache.comparison(user, datasetId);
+    if (cached.isPresent()) return cached.get();
+    var response =
+        results.selectLatestByOwnedDataset(datasetId, user).stream()
+            .map(
+                r -> {
+                  TrackFileDO file = files.selectOwnedById(r.getTrackFileId(), user);
+                  return new DatasetAnalysisComparisonResponse(
+                      r.getTrackFileId(),
+                      file.getOriginalName(),
+                      file.getTrackSource(),
+                      r.getId(),
+                      r.getAbnormalThreshold(),
+                      r.getPointCount(),
+                      r.getMeanError(),
+                      r.getRmse(),
+                      r.getMinError(),
+                      r.getMaxError(),
+                      r.getStandardDeviation(),
+                      r.getAbnormalCount(),
+                      r.getAbnormalRatio(),
+                      r.getMaxErrorTime(),
+                      r.getCreatedAt());
+                })
+            .toList();
+    cache.putComparison(user, datasetId, response);
+    return response;
+  }
+
+  public void evictAfterTask(long user, long file, long dataset) {
+    cache.evict(user, file, dataset);
   }
 
   private Computed compute(long file, double threshold) {

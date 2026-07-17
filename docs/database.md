@@ -86,3 +86,9 @@ Task, report, role, audit-log and Outbox tables remain deferred. Transactional O
 V6 creates immutable `analysis_result` rows with threshold, point count, mean, RMSE, extrema, Welford population standard deviation, abnormal count/ratio and earliest maximum-error time. Its `(track_file_id, created_at DESC, id DESC)` index supports latest and history queries.
 
 V7 creates `abnormal_interval` with ordered sequence/time bounds, point count, peak error/time and unique `(analysis_result_id, interval_no)`. Both foreign keys use `RESTRICT`. `track_point` deliberately does not persist `position_error`; error series are calculated dynamically. MySQL 8.4 tests cover empty V1-V7 migration and V5-to-V7 upgrade with existing user, dataset, file and point data preserved.
+
+## Milestone 5 task schema
+
+V8 creates `analysis_task`. It references one `track_file` and, only after success, one immutable `analysis_result`. Checks constrain threshold, attempts, status and the invariant that only `SUCCESS` may carry a result ID. `(track_file_id, created_at DESC, id DESC)` supports owner-scoped history; `(status, updated_at, id)` supports operational state access. State transitions use conditional updates so duplicate deliveries cannot claim a completed or already-running task. Both foreign keys use `RESTRICT`; task error text is capped at 500 characters and contains safe summaries only.
+
+Migration acceptance covers empty V1—V8 and V5→V8 forward upgrade while preserving existing user, dataset, file and point rows.

@@ -1,5 +1,7 @@
 # 多源航迹数据分析与报告管理平台
 
+> 当前状态（2026-07-17）：里程碑 0—5 已完成，里程碑 6 尚未开始。当前实现包含同步分析、RabbitMQ 异步分析任务（手动 ACK、有界重试、死信和数据库状态幂等）以及 Redis 最新结果/数据集对比 Cache-Aside 缓存；报告仍属于里程碑 6，尚未实现。
+
 `track-analysis-platform` 是一个面向 Java 后端工程实践的模块化单体项目。目标业务闭环是：安全地接收七列航迹 CSV，流式解析和批量入库，异步计算三维误差与连续异常区间，并管理分析结果和模板报告。
 
 > 当前状态：唯一有效路线共七个里程碑（0—6）。里程碑 0—3 已完成，里程碑 4 尚未开始。当前已实现 CSV 上传、MinIO 私有原文件存储、SHA-256 去重、固定七列流式解析和 `track_point` 批量入库；误差/RMSE、异常区间、消息、缓存和报告业务尚未实现。
@@ -162,7 +164,7 @@ No performance measurements exist yet. Basic, honest same-machine measurements b
 
 ## Known limitations
 
-- Milestones 0-4 are complete; milestone 5 has not started. Analysis is synchronous; RabbitMQ, Redis business caching, tasks and reports remain out of scope until later milestones.
+- Milestones 0-4 are complete and milestone 5 is in final acceptance. Synchronous analysis remains available; RabbitMQ asynchronous tasks and Redis summary caching are implemented. Reports remain milestone 6 scope.
 - The Maven Wrapper works without global Maven. The supported and verified runtime is JDK 17; an installed JDK 25 is not used by the project acceptance workflow.
 - The Spring Boot application currently uses MySQL persistence and MinIO object storage. Redis and RabbitMQ remain infrastructure-only until milestone 5.
 - Docker Hub can occasionally return a transient `EOF`; use a finite retry and inspect Docker Desktop proxy/network settings if it persists.

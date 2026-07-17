@@ -94,4 +94,12 @@ This file grows only from implemented and verified project evidence. Resume desc
 
 **How is persistence atomic?** Scanning occurs outside a long transaction. A short transaction inserts one immutable result and its intervals; any failure rolls both back. Raw points and CSV objects are unchanged.
 
-**What remains absent?** There is no persisted `position_error`, `analysis_task`, RabbitMQ analysis path, Redis business cache, report, or milestone 5 implementation.
+**What remains absent after milestone 5?** There is still no persisted `position_error`, report generation, Transactional Outbox, Kafka, distributed lock or milestone 6 delivery work.
+
+## Milestone 5: How are asynchronous delivery and cache consistency handled?
+
+**Base answer:** The database owns task truth. A conditional `PENDING -> RUNNING` update supplies basic idempotency, result/interval/task-success commit atomically, and the broker delivery is ACKed only afterward. Temporary failures use a bounded TTL retry queue; exhausted and permanent failures are recorded and dead-lettered.
+
+**Why not claim exactly once?** RabbitMQ is at-least-once and task creation publishes after its database commit. Publisher confirms detect many failures but do not remove every crash window. Duplicate work is suppressed by state; a Transactional Outbox would close the creation dual-write gap but is intentionally outside this release.
+
+**How is Redis safe?** Ownership is checked first, keys include `userId`, values are explicit JSON DTOs, and only latest/comparison summaries are cached. Successful writes invalidate both affected views after commit. Redis failures degrade to database reads and do not reverse committed business data.

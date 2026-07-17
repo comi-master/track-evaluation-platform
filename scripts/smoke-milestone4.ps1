@@ -104,18 +104,40 @@ try {
     Require ((Request GET "/api/v1/track-files/$radar/analyses/latest" $null $otherToken).Status -eq 404) "Owner isolation failed"
     Require ((Request POST "/api/v1/track-files/$pending/analyses" @{ abnormalThreshold = 0 } $token).Status -eq 409) "Non-PARSED state was accepted"
 
+    $asyncRequestId = "m5-async-request-12345678"
+    $asyncCreated = Request POST "/api/v1/track-files/$radar/analysis-tasks" @{ abnormalThreshold = 1 } $token $asyncRequestId
+    Require ($asyncCreated.Status -eq 202) "Async task creation failed"
+    Require ($asyncCreated.HeaderRequestId -eq $asyncRequestId -and $asyncCreated.Json.requestId -eq $asyncRequestId) "Async request ID mismatch"
+    $taskId = [long]$asyncCreated.Json.data.taskId
+    $taskDeadline = (Get-Date).AddSeconds(30)
+    do {
+        Start-Sleep -Milliseconds 250
+        $task = Request GET "/api/v1/analysis-tasks/$taskId" $null $token
+    } while ($task.Json.data.status -notin @("SUCCESS", "FAILED") -and (Get-Date) -lt $taskDeadline)
+    Require ($task.Status -eq 200 -and $task.Json.data.status -eq "SUCCESS") "Async task did not succeed"
+    Require ($task.Json.data.attemptCount -eq 1 -and $null -ne $task.Json.data.analysisResultId) "Async task result linkage mismatch"
+    $taskHistory = Request GET "/api/v1/track-files/$radar/analysis-tasks?page=1&size=20&status=SUCCESS" $null $token
+    Require ($taskHistory.Status -eq 200 -and $taskHistory.Json.data.total -ge 1) "Async task history failed"
+    Require ((Request POST "/api/v1/analysis-tasks/$taskId/retry" $null $token).Status -eq 409) "Successful task retry was accepted"
+    Require ((Request GET "/api/v1/analysis-tasks/$taskId" $null $otherToken).Status -eq 404) "Async task owner isolation failed"
+    Require ((Request POST "/api/v1/track-files/$pending/analysis-tasks" @{ abnormalThreshold = 0 } $token).Status -eq 409) "Async non-PARSED state was accepted"
+    Require ((Request POST "/api/v1/track-files/$radar/analysis-tasks" @{} $token).Status -eq 400) "Missing async threshold was accepted"
+    Require ((Request POST "/api/v1/track-files/$radar/analysis-tasks" @{ abnormalThreshold = -1 } $token).Status -eq 400) "Negative async threshold was accepted"
+    $asyncComparison = (Request GET "/api/v1/datasets/$datasetId/analysis-comparison" $null $token).Json.data
+    Require (($asyncComparison | Where-Object fileId -eq $radar).abnormalThreshold -eq 1) "Async completion did not invalidate comparison cache"
+
     $logText = (Get-Content $log -Raw) + (Get-Content $errorLog -Raw)
     foreach ($secret in @($env:JWT_SECRET, $env:MINIO_ROOT_PASSWORD, $token, "1,0,0,0,0,0,0")) {
         if ($secret) { Require (-not $logText.Contains($secret)) "Sensitive value or CSV content found in log" }
     }
-    Write-Output "M4_SMOKE=PASS DATASET=$datasetId FILES=4 ANALYSES=4"
+    Write-Output "M5_SMOKE=PASS DATASET=$datasetId FILES=4 SYNC_ANALYSES=4 ASYNC_TASKS=1"
 } finally {
     if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id; $process.WaitForExit(15000) | Out-Null }
     $objects = @('SELECT object_name FROM track_file tf JOIN dataset d ON d.id=tf.dataset_id JOIN sys_user u ON u.id=d.user_id WHERE u.username=''' + $marker + ''';' | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --protocol=socket -u"$MYSQL_USER" -D"$MYSQL_DATABASE" -N -s')
     foreach ($object in $objects) {
         if ($object) { docker compose exec -T minio sh -c "mc alias set local http://localhost:9000 `"`$MINIO_ROOT_USER`" `"`$MINIO_ROOT_PASSWORD`" >/dev/null && mc rm --force local/$env:MINIO_BUCKET/$object >/dev/null" }
     }
-    $cleanup = "DELETE ai FROM abnormal_interval ai JOIN analysis_result ar ON ar.id=ai.analysis_result_id JOIN track_file tf ON tf.id=ar.track_file_id JOIN dataset d ON d.id=tf.dataset_id JOIN sys_user u ON u.id=d.user_id WHERE u.username LIKE '$marker%'; DELETE ar FROM analysis_result ar JOIN track_file tf ON tf.id=ar.track_file_id JOIN dataset d ON d.id=tf.dataset_id JOIN sys_user u ON u.id=d.user_id WHERE u.username LIKE '$marker%'; DELETE tp FROM track_point tp JOIN track_file tf ON tf.id=tp.track_file_id JOIN dataset d ON d.id=tf.dataset_id JOIN sys_user u ON u.id=d.user_id WHERE u.username LIKE '$marker%'; DELETE tf FROM track_file tf JOIN dataset d ON d.id=tf.dataset_id JOIN sys_user u ON u.id=d.user_id WHERE u.username LIKE '$marker%'; DELETE d FROM dataset d JOIN sys_user u ON u.id=d.user_id WHERE u.username LIKE '$marker%'; DELETE FROM sys_user WHERE username LIKE '$marker%';"
+    $cleanup = "DELETE atask FROM analysis_task atask JOIN track_file tf ON tf.id=atask.track_file_id JOIN dataset d ON d.id=tf.dataset_id JOIN sys_user u ON u.id=d.user_id WHERE u.username LIKE '$marker%'; DELETE ai FROM abnormal_interval ai JOIN analysis_result ar ON ar.id=ai.analysis_result_id JOIN track_file tf ON tf.id=ar.track_file_id JOIN dataset d ON d.id=tf.dataset_id JOIN sys_user u ON u.id=d.user_id WHERE u.username LIKE '$marker%'; DELETE ar FROM analysis_result ar JOIN track_file tf ON tf.id=ar.track_file_id JOIN dataset d ON d.id=tf.dataset_id JOIN sys_user u ON u.id=d.user_id WHERE u.username LIKE '$marker%'; DELETE tp FROM track_point tp JOIN track_file tf ON tf.id=tp.track_file_id JOIN dataset d ON d.id=tf.dataset_id JOIN sys_user u ON u.id=d.user_id WHERE u.username LIKE '$marker%'; DELETE tf FROM track_file tf JOIN dataset d ON d.id=tf.dataset_id JOIN sys_user u ON u.id=d.user_id WHERE u.username LIKE '$marker%'; DELETE d FROM dataset d JOIN sys_user u ON u.id=d.user_id WHERE u.username LIKE '$marker%'; DELETE FROM sys_user WHERE username LIKE '$marker%';"
     $cleanup | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --protocol=socket -u"$MYSQL_USER" -D"$MYSQL_DATABASE"'
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }

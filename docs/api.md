@@ -61,7 +61,7 @@ All dataset SQL includes the current `user_id` and `deleted = 0`. Another user's
 | `INFRASTRUCTURE_ERROR` | 503 | Required dependency unavailable |
 | `INTERNAL_ERROR` | 500 | Safe generic response; full cause stays in logs |
 
-Ping, Actuator, authentication, datasets, track-file upload/list/detail/parse/points, synchronous analysis, analysis results, abnormal intervals, error series, comparison, and OpenAPI are implemented. Tasks and reports are not implemented. There is no Refresh Token, Redis login state or RBAC API.
+Ping, Actuator, authentication, datasets, track-file upload/list/detail/parse/points, synchronous and asynchronous analysis, task state/history/retry, analysis results, abnormal intervals, error series, comparison, and OpenAPI are implemented. Reports are not implemented. There is no Refresh Token, Redis login state or RBAC API.
 
 ### Synchronous analysis (milestone 4)
 
@@ -70,7 +70,18 @@ Ping, Actuator, authentication, datasets, track-file upload/list/detail/parse/po
 - `GET /api/v1/track-files/{fileId}/error-series` pages dynamically calculated errors; `track_point` deliberately has no persisted `position_error` field.
 - `GET /api/v1/datasets/{datasetId}/analysis-comparison` returns the newest result for each analysed file, without aggregating by source.
 
-Analysis uses keyset batches and Welford population standard deviation. An abnormal point satisfies `error > threshold`; no RabbitMQ, Redis business cache, `analysis_task`, or report feature is introduced.
+Analysis uses keyset batches and Welford population standard deviation. An abnormal point satisfies `error > threshold`.
+
+### Asynchronous analysis tasks (milestone 5)
+
+- `POST /api/v1/track-files/{fileId}/analysis-tasks` accepts `{"abnormalThreshold":30.0}` and returns `202` with a persisted `PENDING` task.
+- `GET /api/v1/analysis-tasks/{taskId}` returns an owner-scoped task.
+- `GET /api/v1/track-files/{fileId}/analysis-tasks?page=1&size=20&status=FAILED` returns capped task history; `status` is optional.
+- `POST /api/v1/analysis-tasks/{taskId}/retry` returns `202` only for an owned `FAILED` task; other states return `409`.
+
+The existing synchronous analysis endpoint remains supported. Missing, negative, non-finite or otherwise invalid thresholds return `400`; unowned resources are deliberately indistinguishable from missing resources (`404`), and non-`PARSED` files return `409`. Task errors expose only a bounded safe message, never broker credentials, JWTs or CSV content.
+
+Latest-result and dataset-comparison reads use owner-keyed Redis Cache-Aside after database ownership validation. Cache outages fall through to MySQL. Task state, error series, point lists, nulls and empty comparisons are not cached.
 # Milestone 3 track-file API
 
 All endpoints below require `Authorization: Bearer <access-token>`. Missing resources and resources owned by another user both return `404`.

@@ -24,6 +24,25 @@ spring:
     multipart:
       max-file-size: ${TRACK_FILE_MAX_SIZE_BYTES:20971520}B
       max-request-size: ${TRACK_REQUEST_MAX_SIZE_BYTES:22020096}B
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:${RABBITMQ_DEFAULT_USER:guest}}
+    password: ${RABBITMQ_PASSWORD:${RABBITMQ_DEFAULT_PASS:guest}}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        auto-startup: ${RABBITMQ_LISTENER_ENABLED:true}
+        acknowledge-mode: manual
+        default-requeue-rejected: false
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 500ms
+      timeout: 500ms
 
 storage:
   minio:
@@ -35,6 +54,12 @@ storage:
 track:
   analysis:
     batch-size: ${ANALYSIS_BATCH_SIZE:1000}
+  task:
+    max-attempts: ${ANALYSIS_TASK_MAX_ATTEMPTS:3}
+    retry-delay-milliseconds: ${ANALYSIS_RETRY_DELAY_MILLISECONDS:5000}
+  cache:
+    latest-ttl: ${ANALYSIS_LATEST_CACHE_TTL:PT10M}
+    comparison-ttl: ${ANALYSIS_COMPARISON_CACHE_TTL:PT5M}
   file:
     max-size-bytes: ${TRACK_FILE_MAX_SIZE_BYTES:20971520}
     max-rows: ${TRACK_FILE_MAX_ROWS:200000}
@@ -82,7 +107,7 @@ management:
 info:
   application:
     name: ${spring.application.name}
-    milestone: 4
+    milestone: 5
 
 logging:
   pattern:

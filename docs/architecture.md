@@ -2,7 +2,7 @@
 
 ## Current milestone 3 acceptance
 
-The application remains one Spring Boot process. Spring Security authenticates one signed JWT Access Token and owner-scoped Mapper SQL protects resources. MinIO upload, synchronous CSV parsing and synchronous keyset/Welford analysis are implemented; messaging, business cache, tasks and reports remain deferred.
+The application remains one Spring Boot process. Spring Security authenticates one signed JWT Access Token and owner-scoped Mapper SQL protects resources. MinIO upload, synchronous CSV parsing, shared keyset/Welford analysis, RabbitMQ asynchronous tasks and Redis summary caching are implemented; reports remain deferred.
 
 ```mermaid
 flowchart TD
@@ -87,7 +87,7 @@ Spring Security runs statelessly with CSRF, form login and HTTP Basic disabled. 
 
 ## Delivery boundary
 
-The active route contains seven milestones numbered 0-6. Milestones 0-4 are complete and milestone 5 has not started. The first release remains a modular monolith. Transactional Outbox, microservice decomposition, and a Prometheus/Grafana platform are future extensions only.
+The active route contains seven milestones numbered 0-6. Milestones 0-4 are complete and milestone 5 is in final acceptance. The first release remains a modular monolith. Transactional Outbox, microservice decomposition, and a Prometheus/Grafana platform are future extensions only.
 
 ## Dependency rules
 
@@ -105,4 +105,12 @@ Parse first atomically claims `UPLOADED` or `FAILED` as `PARSING`. The MinIO obj
 
 ## Implemented milestone 4 analysis flow
 
-Analysis is synchronous. The service validates an owner-scoped `PARSED` file, then reads points outside a transaction using configurable keyset batches (`sequence_no > cursor`, ascending, limited). Welford accumulation produces population standard deviation while squared errors produce RMSE. A short transaction inserts one immutable result and all contiguous abnormal intervals; any interval failure rolls back the result. No MinIO call occurs during analysis, and RabbitMQ, Redis business caching, `analysis_task`, reports and milestone 5 behavior remain absent.
+The synchronous service validates an owner-scoped `PARSED` file, then reads points outside a transaction using configurable keyset batches (`sequence_no > cursor`, ascending, limited). Welford accumulation produces population standard deviation while squared errors produce RMSE. A short transaction inserts one immutable result and all contiguous abnormal intervals; any interval failure rolls back the result. No MinIO call occurs during analysis.
+
+## Implemented milestone 5 asynchronous flow
+
+Task creation commits a `PENDING` database row before publishing `{schemaVersion,taskId}`. The publisher uses a durable direct exchange, mandatory routing and correlated confirms; a negative confirm or return marks publication failure safely. The consumer uses manual ACK and conditionally claims `PENDING -> RUNNING`, incrementing the attempt count. Analysis result, intervals and `RUNNING -> SUCCESS` are committed in one database transaction, then affected cache keys are invalidated and the delivery is ACKed.
+
+Temporary failures conditionally restore `PENDING` and publish to a TTL retry queue until `max_attempts`; exhausted or permanent failures become `FAILED` and are routed to the dead queue. Deliveries for `SUCCESS` or `RUNNING` do not create a second result. This is database-state idempotency, not exactly-once transport. Publishing still has the normal database/message dual-write window; Transactional Outbox is an explicitly deferred extension.
+
+Redis stores explicit JSON response DTOs without polymorphic default typing. Keys include `userId`; ownership is checked in MySQL before lookup. Latest results expire after 10 minutes and comparisons after 5 minutes. Cache read/write/delete failures are availability degradations and never roll back committed analysis data.

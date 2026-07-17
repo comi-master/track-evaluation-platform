@@ -31,11 +31,32 @@ class DatabaseConstraintIT extends MySqlIntegrationTestSupport {
         .containsExactly(
             "abnormal_interval",
             "analysis_result",
+            "analysis_task",
             "dataset",
             "flyway_schema_history",
             "sys_user",
             "track_file",
             "track_point");
+
+    Map<String, Map<String, Object>> taskColumns = columnsByName("analysis_task");
+    assertThat(taskColumns)
+        .containsOnlyKeys(
+            "id",
+            "track_file_id",
+            "abnormal_threshold",
+            "status",
+            "attempt_count",
+            "max_attempts",
+            "analysis_result_id",
+            "error_message",
+            "version",
+            "started_at",
+            "finished_at",
+            "created_at",
+            "updated_at");
+    assertColumn(taskColumns, "status", "varchar(16)", "NO", null);
+    assertColumn(taskColumns, "attempt_count", "int unsigned", "NO", "0");
+    assertColumn(taskColumns, "max_attempts", "int unsigned", "NO", "3");
 
     Map<String, Map<String, Object>> userColumns = columnsByName("sys_user");
     assertThat(userColumns)

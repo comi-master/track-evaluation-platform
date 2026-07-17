@@ -66,7 +66,7 @@ Every IT uses a JUnit-managed Testcontainer with independent credentials and dat
 
 No later failure scenario is marked tested until its test has actually run.
 
-The active test route follows milestones 0-6. Milestones 0-4 verification is complete; milestone 5 has not started. Transactional Outbox recovery and Prometheus/Grafana platform tests remain outside the first-release suite.
+The active test route follows milestones 0-6. Milestones 0-4 verification is complete and milestone 5 is in final acceptance. Transactional Outbox recovery and Prometheus/Grafana platform tests remain outside the first-release suite.
 
 ## Recorded milestone 0 result
 
@@ -93,3 +93,11 @@ MySQL 8.4 integration tests cover V1-V7, V5-to-V7 preservation, result/interval 
 ## Recorded milestone 4 result
 
 On 2026-07-17, Java 17 ordinary verification ran 74 tests. The complete `clean verify -Pit` run executed those 74 plus 42 isolated integration tests, with 0 failures, 0 errors and 0 skipped. Compose smoke testing passed health, three-source upload/parse/analysis, hand-calculated values, all analysis queries, latest-only comparison, owner/state/request-ID/sensitive-log checks, exact temporary cleanup and project-process shutdown.
+
+## Milestone 5 asynchronous and cache coverage
+
+Ordinary tests cover threshold validation, ownership/state rejection, create/publish failure, failed-only retry, manual ACK/NACK, duplicate SUCCESS/RUNNING delivery, bounded retry, exhaustion/dead routing, safe permanent errors, cache key user isolation, hit/miss, configured TTL, invalidation, empty-value avoidance and Redis failure fallback.
+
+Isolated integration tests use MySQL 8.4.10, RabbitMQ 4.2.8-management and Redis 8.2.7-alpine Testcontainers rather than Compose. They cover V1—V8 and V5→V8, durable main/retry/dead queues, normal asynchronous completion with one result and one attempt, duplicate-delivery idempotency, permanent failure persistence/dead lettering, and real Redis write/TTL/invalidation behavior.
+
+On 2026-07-17, Java 17 ordinary verification ran 89 tests. The final `clean verify -Pit` ran those 89 plus 44 isolated integration tests (133 total), with 0 failures, 0 errors and 0 skipped. The Compose smoke test passed health, three-source upload/parse/synchronous hand-calculated analysis, asynchronous creation/completion/history, comparison invalidation, ownership/state/input/request-ID/sensitive-log checks, exact data/object cleanup and application shutdown. No Testcontainers or project Java process remained.

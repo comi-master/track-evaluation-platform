@@ -5,6 +5,10 @@ security:
     access-ttl-minutes: 120
 
 spring:
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
   test:
     mockmvc:
       print: none

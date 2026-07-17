@@ -66,7 +66,7 @@ Every IT uses a JUnit-managed Testcontainer with independent credentials and dat
 
 No later failure scenario is marked tested until its test has actually run.
 
-The active test route follows milestones 0-6. Milestones 0-3 verification is complete; milestone 4 has not started. Transactional Outbox recovery and Prometheus/Grafana platform tests remain outside the first-release suite.
+The active test route follows milestones 0-6. Milestones 0-4 verification is complete; milestone 5 has not started. Transactional Outbox recovery and Prometheus/Grafana platform tests remain outside the first-release suite.
 
 ## Recorded milestone 0 result
 
@@ -83,3 +83,13 @@ On 2026-07-17, Java 17 ordinary verification ran 49 tests without Docker. After 
 ## Recorded milestone 3 result
 
 On 2026-07-17, Java 17 ordinary verification ran 63 tests without Docker; `clean verify -Pit` ran those 63 plus 36 isolated MySQL 8.4/MinIO integration tests, all with 0 failures, 0 errors, and 0 skipped. Flyway V1-V5, V3-to-V5 forward migration, XML batch insertion, real object upload/read, 501-row parsing, rollback after a post-batch invalid row, FAILED state, pagination and owner isolation passed. Compose smoke testing passed the complete local upload/parse flow, duplicate and invalid cases, request ID and sensitive-log checks, exact temporary-record/object cleanup, and clean application shutdown. Independent review completed once with 0 Critical, 0 High, 5 Medium and 2 Low; all Medium findings were fixed and verification rerun.
+
+## Milestone 4 analysis coverage
+
+Hand-calculable errors `0, 3, 4` assert mean `7/3`, RMSE `sqrt(25/3)`, population deviation `sqrt(26/9)`, extrema and earliest maximum time. Ordinary tests also cover zero/single-point input, strict `error > threshold`, all/none/multiple abnormal intervals, final/cross-batch closure, sequence gaps, invalid time/sequence order, NaN/infinity, ownership, state and threshold failures.
+
+MySQL 8.4 integration tests cover V1-V7, V5-to-V7 preservation, result/interval constraints, transactional rollback, synchronous HTTP analysis, latest/history/interval/error-series queries, three-source per-file comparison, newest-result selection, request ID equality, state conflicts and owner isolation. Testcontainers use isolated databases and do not read local Compose data.
+
+## Recorded milestone 4 result
+
+On 2026-07-17, Java 17 ordinary verification ran 74 tests. The complete `clean verify -Pit` run executed those 74 plus 42 isolated integration tests, with 0 failures, 0 errors and 0 skipped. Compose smoke testing passed health, three-source upload/parse/analysis, hand-calculated values, all analysis queries, latest-only comparison, owner/state/request-ID/sensitive-log checks, exact temporary cleanup and project-process shutdown.

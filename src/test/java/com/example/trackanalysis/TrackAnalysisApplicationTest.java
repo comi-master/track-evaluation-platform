@@ -1,5 +1,7 @@
 package com.example.trackanalysis;
 
+import com.example.trackanalysis.analysis.infrastructure.persistence.AbnormalIntervalMapper;
+import com.example.trackanalysis.analysis.infrastructure.persistence.AnalysisResultMapper;
 import com.example.trackanalysis.dataset.infrastructure.persistence.DatasetMapper;
 import com.example.trackanalysis.track.infrastructure.persistence.TrackFileMapper;
 import com.example.trackanalysis.track.infrastructure.persistence.TrackPointMapper;
@@ -18,6 +20,8 @@ class TrackAnalysisApplicationTest {
   @MockitoBean private DatasetMapper datasetMapper;
   @MockitoBean private TrackFileMapper trackFileMapper;
   @MockitoBean private TrackPointMapper trackPointMapper;
+  @MockitoBean private AnalysisResultMapper analysisResultMapper;
+  @MockitoBean private AbnormalIntervalMapper abnormalIntervalMapper;
   @MockitoBean private TransactionTemplate transactionTemplate;
 
   @Test

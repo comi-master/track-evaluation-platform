@@ -2,7 +2,7 @@
 
 ## Current milestone 3 acceptance
 
-The application remains one Spring Boot process. Spring Security authenticates one signed JWT Access Token, reloads the current user for every protected request, and rejects deleted, disabled, or invalidated accounts. Application services own transactions; feature-local MyBatis-Plus mappers include ownership in SQL. MinIO-backed track-file upload and synchronous CSV parsing are implemented; analysis, messaging, cache and reports remain deferred.
+The application remains one Spring Boot process. Spring Security authenticates one signed JWT Access Token and owner-scoped Mapper SQL protects resources. MinIO upload, synchronous CSV parsing and synchronous keyset/Welford analysis are implemented; messaging, business cache, tasks and reports remain deferred.
 
 ```mermaid
 flowchart TD
@@ -87,7 +87,7 @@ Spring Security runs statelessly with CSRF, form login and HTTP Basic disabled. 
 
 ## Delivery boundary
 
-The active route contains seven milestones numbered 0-6. Milestones 0-3 are complete; milestone 4 has not started. The first release remains a modular monolith and prioritizes a demonstrable upload-analysis-report business closure over infrastructure breadth. The former 0-12 route is historical. Transactional Outbox, microservice decomposition, and a Prometheus/Grafana platform are future extensions only.
+The active route contains seven milestones numbered 0-6. Milestones 0-4 are complete and milestone 5 has not started. The first release remains a modular monolith. Transactional Outbox, microservice decomposition, and a Prometheus/Grafana platform are future extensions only.
 
 ## Dependency rules
 
@@ -102,3 +102,7 @@ The active route contains seven milestones numbered 0-6. Milestones 0-3 are comp
 Upload and parse are deliberately separate synchronous APIs. Upload streams the multipart body to a permission-controlled temporary file while calculating SHA-256, writes the raw object under `{userId}/{datasetId}/{uuid}.csv`, then inserts immutable `track_file` metadata. If the database insert fails, only the newly written object is removed on a best-effort basis.
 
 Parse first atomically claims `UPLOADED` or `FAILED` as `PARSING`. The MinIO object is copied to a bounded temporary file outside a database transaction. A single database transaction then parses that local file incrementally, writes 500-row MyBatis XML batches, and marks `PARSED`; any row or batch failure rolls back every point. A separate short transaction marks `FAILED` with a bounded safe summary. MySQL and MinIO do not share a local transaction, this is minimal compensation rather than distributed atomicity, and no Outbox is implemented.
+
+## Implemented milestone 4 analysis flow
+
+Analysis is synchronous. The service validates an owner-scoped `PARSED` file, then reads points outside a transaction using configurable keyset batches (`sequence_no > cursor`, ascending, limited). Welford accumulation produces population standard deviation while squared errors produce RMSE. A short transaction inserts one immutable result and all contiguous abnormal intervals; any interval failure rolls back the result. No MinIO call occurs during analysis, and RabbitMQ, Redis business caching, `analysis_task`, reports and milestone 5 behavior remain absent.

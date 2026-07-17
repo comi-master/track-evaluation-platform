@@ -33,6 +33,8 @@ storage:
     bucket: ${MINIO_BUCKET:track-files}
 
 track:
+  analysis:
+    batch-size: ${ANALYSIS_BATCH_SIZE:1000}
   file:
     max-size-bytes: ${TRACK_FILE_MAX_SIZE_BYTES:20971520}
     max-rows: ${TRACK_FILE_MAX_ROWS:200000}
@@ -80,7 +82,7 @@ management:
 info:
   application:
     name: ${spring.application.name}
-    milestone: 3
+    milestone: 4
 
 logging:
   pattern:

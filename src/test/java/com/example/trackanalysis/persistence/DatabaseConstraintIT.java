@@ -29,7 +29,13 @@ class DatabaseConstraintIT extends MySqlIntegrationTestSupport {
             String.class);
     assertThat(tables)
         .containsExactly(
-            "dataset", "flyway_schema_history", "sys_user", "track_file", "track_point");
+            "abnormal_interval",
+            "analysis_result",
+            "dataset",
+            "flyway_schema_history",
+            "sys_user",
+            "track_file",
+            "track_point");
 
     Map<String, Map<String, Object>> userColumns = columnsByName("sys_user");
     assertThat(userColumns)
@@ -237,6 +243,90 @@ class DatabaseConstraintIT extends MySqlIntegrationTestSupport {
                     """,
                     fileId))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  void analysisResultChecksAndForeignKeyRejectInvalidRows() {
+    long fileId = insertParsedFile("analysis-constraint-owner", "analysis-constraint.csv");
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    """
+                    INSERT INTO analysis_result
+                    (track_file_id,abnormal_threshold,point_count,mean_error,rmse,min_error,max_error,
+                     standard_deviation,abnormal_count,abnormal_ratio,max_error_time)
+                    VALUES (?, -1, 1, 0, 0, 0, 0, 0, 0, 0, 1)
+                    """,
+                    fileId))
+        .isInstanceOf(DataAccessException.class);
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    """
+                    INSERT INTO analysis_result
+                    (track_file_id,abnormal_threshold,point_count,mean_error,rmse,min_error,max_error,
+                     standard_deviation,abnormal_count,abnormal_ratio,max_error_time)
+                    VALUES (?, 0, 1, 0, 0, 0, 0, 0, 2, 2, 1)
+                    """,
+                    fileId))
+        .isInstanceOf(DataAccessException.class);
+  }
+
+  @Test
+  void abnormalIntervalChecksUniquenessAndForeignKey() {
+    long fileId = insertParsedFile("interval-constraint-owner", "interval-constraint.csv");
+    jdbcTemplate.update(
+        """
+        INSERT INTO analysis_result
+        (track_file_id,abnormal_threshold,point_count,mean_error,rmse,min_error,max_error,
+         standard_deviation,abnormal_count,abnormal_ratio,max_error_time)
+        VALUES (?, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1)
+        """,
+        fileId);
+    long resultId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM analysis_result WHERE track_file_id = ?", Long.class, fileId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO abnormal_interval
+        (analysis_result_id,interval_no,start_sequence,end_sequence,start_time,end_time,
+         point_count,peak_error,peak_error_time)
+        VALUES (?,1,1,1,1,1,1,1,1)
+        """,
+        resultId);
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    """
+                    INSERT INTO abnormal_interval
+                    (analysis_result_id,interval_no,start_sequence,end_sequence,start_time,end_time,
+                     point_count,peak_error,peak_error_time)
+                    VALUES (?,1,2,1,2,1,0,-1,1)
+                    """,
+                    resultId))
+        .isInstanceOf(DataAccessException.class);
+  }
+
+  private long insertParsedFile(String username, String name) {
+    insertUser(username);
+    Long userId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM sys_user WHERE username = ?", Long.class, username);
+    jdbcTemplate.update("INSERT INTO dataset (user_id,name) VALUES (?,?)", userId, name);
+    Long datasetId =
+        jdbcTemplate.queryForObject("SELECT id FROM dataset WHERE user_id = ?", Long.class, userId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO track_file
+        (dataset_id,original_name,object_name,sha256,file_size,track_source,parse_status,point_count)
+        VALUES (?,?,?, ?,10,'RADAR','PARSED',1)
+        """,
+        datasetId,
+        name,
+        username + "/file.csv",
+        ("a" + Integer.toHexString(username.hashCode())).repeat(64).substring(0, 64));
+    return jdbcTemplate.queryForObject(
+        "SELECT id FROM track_file WHERE dataset_id = ?", Long.class, datasetId);
   }
 
   private Map<String, Map<String, Object>> columnsByName(String tableName) {

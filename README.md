@@ -126,8 +126,8 @@ JaCoCo HTML output is generated under `target/site/jacoco/`. Test and coverage r
 On 2026-07-17, `java` and Maven Wrapper both used JetBrains OpenJDK 17.0.14 from `D:\java\JDK17`. Maven 3.9.11 compiled with `--release 17` and produced Java 17 class-file version 61.
 
 - `spotless:apply` and `spotless:check`: passed.
-- `clean verify`: passed without starting Docker; 63 tests, 0 failures, 0 errors, 0 skipped.
-- `clean verify -Pit`: passed with isolated MySQL 8.4 and MinIO Testcontainers; 63 ordinary tests plus 36 integration tests, 0 failures, 0 errors, 0 skipped.
+- `clean verify`: passed without starting Docker; 74 tests, 0 failures, 0 errors, 0 skipped.
+- `clean verify -Pit`: passed with isolated MySQL 8.4 and MinIO Testcontainers; 74 ordinary tests plus 42 integration tests, 0 failures, 0 errors, 0 skipped.
 - Dependency tree: completed without an additional raw MyBatis starter or unresolved version conflict. Flyway was minimally overridden within major version 11 because Boot's managed 11.7.2 warned that MySQL 8.4 had not been tested; 11.20.1 passed the complete suite without that warning.
 - Packaged application smoke test on JDK 17: local MySQL reached Flyway V3, and the complete register/login/current-user/dataset CRUD-page/logout flow passed. An old token returned 401 after logout, `/actuator/health` returned `UP`, request ID matched in header and body, the process stopped cleanly, and checked logs contained no password, JWT secret, or complete token.
 - Docker: Desktop 4.82.0, Engine 29.6.1 on Linux/amd64, and Compose v5.3.0. A forced recreation preserved all named volumes; MySQL, Redis, RabbitMQ, and MinIO all reached `healthy`, passed service-specific connection or endpoint checks, and published ports only on `127.0.0.1`. MySQL and Redis health checks authenticate through process environment variables rather than password arguments. Redis validates its password, creates a `600 redis:redis` temporary configuration on every start, and keeps the real value out of container command metadata, PID 1 arguments, health-check metadata, and logs.
@@ -162,7 +162,7 @@ No performance measurements exist yet. Basic, honest same-machine measurements b
 
 ## Known limitations
 
-- Milestones 0-3 are complete; milestones 4-6 have not started, so this is not yet the full business product.
+- Milestones 0-4 are complete; milestone 5 has not started. Analysis is synchronous; RabbitMQ, Redis business caching, tasks and reports remain out of scope until later milestones.
 - The Maven Wrapper works without global Maven. The supported and verified runtime is JDK 17; an installed JDK 25 is not used by the project acceptance workflow.
 - The Spring Boot application currently uses MySQL persistence and MinIO object storage. Redis and RabbitMQ remain infrastructure-only until milestone 5.
 - Docker Hub can occasionally return a transient `EOF`; use a finite retry and inspect Docker Desktop proxy/network settings if it persists.

@@ -61,7 +61,16 @@ All dataset SQL includes the current `user_id` and `deleted = 0`. Another user's
 | `INFRASTRUCTURE_ERROR` | 503 | Required dependency unavailable |
 | `INTERNAL_ERROR` | 500 | Safe generic response; full cause stays in logs |
 
-Ping, Actuator, authentication, datasets, track-file upload/list/detail/parse/points, and OpenAPI are implemented. Tasks, analysis results, intervals and reports are planned for later milestones and must not be treated as available APIs. There is no Refresh Token, Redis login state or RBAC API.
+Ping, Actuator, authentication, datasets, track-file upload/list/detail/parse/points, synchronous analysis, analysis results, abnormal intervals, error series, comparison, and OpenAPI are implemented. Tasks and reports are not implemented. There is no Refresh Token, Redis login state or RBAC API.
+
+### Synchronous analysis (milestone 4)
+
+- `POST /api/v1/track-files/{fileId}/analyses` creates an immutable analysis for an owned `PARSED` file; request body is `{"abnormalThreshold": 30.0}` and success is `201`.
+- `GET /api/v1/track-files/{fileId}/analyses/latest`, `GET /api/v1/track-files/{fileId}/analyses`, and `GET /api/v1/analysis-results/{analysisId}/abnormal-intervals` return owner-scoped results.
+- `GET /api/v1/track-files/{fileId}/error-series` pages dynamically calculated errors; `track_point` deliberately has no persisted `position_error` field.
+- `GET /api/v1/datasets/{datasetId}/analysis-comparison` returns the newest result for each analysed file, without aggregating by source.
+
+Analysis uses keyset batches and Welford population standard deviation. An abnormal point satisfies `error > threshold`; no RabbitMQ, Redis business cache, `analysis_task`, or report feature is introduced.
 # Milestone 3 track-file API
 
 All endpoints below require `Authorization: Bearer <access-token>`. Missing resources and resources owned by another user both return `404`.

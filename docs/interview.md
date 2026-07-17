@@ -85,3 +85,13 @@ This file grows only from implemented and verified project evidence. Resume desc
 **How are IDOR and parser leakage prevented?** File and point SQL joins the file to its dataset and authenticated `user_id`; foreign and absent IDs both produce 404. Parser errors expose a bounded line number and reason without logging or storing the row content.
 
 **Project evidence:** Flyway V4/V5, `TrackFileApplicationService`, `CsvTrackParser`, private MinIO adapter, `TrackPointMapper.xml`, ordinary tests and dual-container `TrackFileApiIT`.
+
+## Milestone 4: Why synchronous analysis and keyset scanning?
+
+**Base answer:** The first analysis closure is synchronous so failure and transaction semantics remain explicit before messaging is introduced. Points use `sequence_no > cursor ORDER BY sequence_no LIMIT batchSize`; no full list or large OFFSET is used.
+
+**How are statistics and intervals calculated?** Three-dimensional Euclidean error feeds Welford population variance and squared-error RMSE. Only `error > threshold` is abnormal. Normal points and sequence gaps close intervals; equal maxima keep the earliest time.
+
+**How is persistence atomic?** Scanning occurs outside a long transaction. A short transaction inserts one immutable result and its intervals; any failure rolls both back. Raw points and CSV objects are unchanged.
+
+**What remains absent?** There is no persisted `position_error`, `analysis_task`, RabbitMQ analysis path, Redis business cache, report, or milestone 5 implementation.

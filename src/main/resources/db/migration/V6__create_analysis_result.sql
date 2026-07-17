@@ -1,0 +1,23 @@
+CREATE TABLE analysis_result (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    track_file_id BIGINT NOT NULL,
+    abnormal_threshold DOUBLE NOT NULL,
+    point_count BIGINT UNSIGNED NOT NULL,
+    mean_error DOUBLE NOT NULL,
+    rmse DOUBLE NOT NULL,
+    min_error DOUBLE NOT NULL,
+    max_error DOUBLE NOT NULL,
+    standard_deviation DOUBLE NOT NULL,
+    abnormal_count BIGINT UNSIGNED NOT NULL,
+    abnormal_ratio DOUBLE NOT NULL,
+    max_error_time DOUBLE NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_analysis_result PRIMARY KEY (id),
+    CONSTRAINT fk_analysis_result_file FOREIGN KEY (track_file_id) REFERENCES track_file (id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT chk_analysis_threshold CHECK (abnormal_threshold >= 0),
+    CONSTRAINT chk_analysis_points CHECK (point_count > 0),
+    CONSTRAINT chk_analysis_statistics CHECK (mean_error >= 0 AND rmse >= 0 AND min_error >= 0 AND max_error >= 0 AND standard_deviation >= 0),
+    CONSTRAINT chk_analysis_abnormal_count CHECK (abnormal_count <= point_count),
+    CONSTRAINT chk_analysis_ratio CHECK (abnormal_ratio >= 0 AND abnormal_ratio <= 1),
+    INDEX idx_analysis_result_file_created (track_file_id, created_at DESC, id DESC)
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

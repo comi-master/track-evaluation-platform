@@ -1,0 +1,21 @@
+CREATE TABLE abnormal_interval (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    analysis_result_id BIGINT NOT NULL,
+    interval_no INT UNSIGNED NOT NULL,
+    start_sequence BIGINT UNSIGNED NOT NULL,
+    end_sequence BIGINT UNSIGNED NOT NULL,
+    start_time DOUBLE NOT NULL,
+    end_time DOUBLE NOT NULL,
+    point_count BIGINT UNSIGNED NOT NULL,
+    peak_error DOUBLE NOT NULL,
+    peak_error_time DOUBLE NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_abnormal_interval PRIMARY KEY (id),
+    CONSTRAINT fk_abnormal_interval_result FOREIGN KEY (analysis_result_id) REFERENCES analysis_result (id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT uk_abnormal_interval_number UNIQUE (analysis_result_id, interval_no),
+    CONSTRAINT chk_interval_sequence CHECK (end_sequence >= start_sequence),
+    CONSTRAINT chk_interval_time CHECK (end_time >= start_time),
+    CONSTRAINT chk_interval_points CHECK (point_count > 0),
+    CONSTRAINT chk_interval_peak CHECK (peak_error >= 0),
+    INDEX idx_abnormal_interval_result_number (analysis_result_id, interval_no)
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

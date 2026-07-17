@@ -2,21 +2,25 @@
 
 ## Implemented scope
 
-Milestones 1-3 contain four business tables through immutable Flyway migrations:
+Milestones 1-4 contain six business tables through immutable Flyway migrations:
 
 - `V1__create_sys_user.sql`
 - `V2__create_dataset.sql`
 - `V3__add_user_auth_version.sql`
 - `V4__create_track_file.sql`
 - `V5__create_track_point.sql`
+- `V6__create_analysis_result.sql`
+- `V7__create_abnormal_interval.sql`
 
-Flyway also owns `flyway_schema_history`. No role, analysis, task, interval, report, audit, or outbox table exists yet.
+Flyway also owns `flyway_schema_history`. No role, task, report, audit, or outbox table exists.
 
 ```mermaid
 erDiagram
     SYS_USER ||--o{ DATASET : owns
     DATASET ||--o{ TRACK_FILE : contains
     TRACK_FILE ||--o{ TRACK_POINT : parses_to
+    TRACK_FILE ||--o{ ANALYSIS_RESULT : analyzed_as
+    ANALYSIS_RESULT ||--o{ ABNORMAL_INTERVAL : contains
 ```
 
 ## `track_file` and `track_point`
@@ -75,4 +79,10 @@ The integration suite executes the owner pagination SQL with `EXPLAIN` and asser
 
 Application-service public use cases own `@Transactional`; controllers and mappers do not. Runtime exceptions roll back by default, checked exceptions require deliberate conversion or `rollbackFor`, and external MinIO/RabbitMQ calls must not be held inside long database transactions.
 
-Analysis/task/result/interval tables, reports, roles, audit logs, and Outbox are deferred until their business milestones define real fields and query paths. Transactional Outbox remains outside the first release.
+Task, report, role, audit-log and Outbox tables remain deferred. Transactional Outbox remains outside the first release.
+
+## Milestone 4 analysis schema
+
+V6 creates immutable `analysis_result` rows with threshold, point count, mean, RMSE, extrema, Welford population standard deviation, abnormal count/ratio and earliest maximum-error time. Its `(track_file_id, created_at DESC, id DESC)` index supports latest and history queries.
+
+V7 creates `abnormal_interval` with ordered sequence/time bounds, point count, peak error/time and unique `(analysis_result_id, interval_no)`. Both foreign keys use `RESTRICT`. `track_point` deliberately does not persist `position_error`; error series are calculated dynamically. MySQL 8.4 tests cover empty V1-V7 migration and V5-to-V7 upgrade with existing user, dataset, file and point data preserved.

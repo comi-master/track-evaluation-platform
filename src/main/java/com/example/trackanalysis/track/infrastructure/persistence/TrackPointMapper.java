@@ -26,4 +26,16 @@ public interface TrackPointMapper {
       """)
   IPage<TrackPointDO> selectOwnedPage(
       Page<TrackPointDO> page, @Param("fileId") long fileId, @Param("userId") long userId);
+
+  @Select(
+      """
+      SELECT id, track_file_id, sequence_no, time_value, true_x, true_y, true_z,
+             track_x, track_y, track_z, created_at
+      FROM track_point WHERE track_file_id = #{fileId} AND sequence_no > #{afterSequence}
+      ORDER BY sequence_no ASC LIMIT #{limit}
+      """)
+  List<TrackPointDO> selectAfterSequence(
+      @Param("fileId") long fileId,
+      @Param("afterSequence") long afterSequence,
+      @Param("limit") int limit);
 }

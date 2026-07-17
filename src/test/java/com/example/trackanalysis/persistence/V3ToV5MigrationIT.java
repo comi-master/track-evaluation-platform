@@ -24,10 +24,10 @@ class V3ToV5MigrationIT {
           .withPassword(UUID.randomUUID().toString());
 
   @Test
-  void upgradesV3DataToV5WithoutChangingExistingUsersOrDatasets() {
+  void upgradesV5DataToV7WithoutChangingExistingTrackData() {
     Flyway.configure()
         .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
-        .target(MigrationVersion.fromVersion("3"))
+        .target(MigrationVersion.fromVersion("5"))
         .load()
         .migrate();
     JdbcTemplate jdbc =
@@ -42,6 +42,27 @@ class V3ToV5MigrationIT {
         jdbc.queryForObject(
             "SELECT id FROM sys_user WHERE username = 'preserved-user'", Long.class);
     jdbc.update("INSERT INTO dataset (user_id, name) VALUES (?, ?)", userId, "preserved-dataset");
+    Long datasetId =
+        jdbc.queryForObject("SELECT id FROM dataset WHERE name = 'preserved-dataset'", Long.class);
+    jdbc.update(
+        """
+        INSERT INTO track_file
+        (dataset_id, original_name, object_name, sha256, file_size, track_source,
+         parse_status, point_count)
+        VALUES (?, 'preserved.csv', 'preserved/object.csv', ?, 10, 'RADAR', 'PARSED', 1)
+        """,
+        datasetId,
+        "f".repeat(64));
+    Long fileId =
+        jdbc.queryForObject(
+            "SELECT id FROM track_file WHERE original_name = 'preserved.csv'", Long.class);
+    jdbc.update(
+        """
+        INSERT INTO track_point
+        (track_file_id, sequence_no, time_value, true_x, true_y, true_z, track_x, track_y, track_z)
+        VALUES (?, 1, 1, 0, 0, 0, 3, 0, 0)
+        """,
+        fileId);
 
     Flyway.configure()
         .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
@@ -59,8 +80,13 @@ class V3ToV5MigrationIT {
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND"
-                    + " table_name IN ('track_file','track_point')",
+                    + " table_name IN"
+                    + " ('track_file','track_point','analysis_result','abnormal_interval')",
                 Integer.class))
-        .isEqualTo(2);
+        .isEqualTo(4);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM track_point WHERE track_file_id = ?", Integer.class, fileId))
+        .isOne();
   }
 }

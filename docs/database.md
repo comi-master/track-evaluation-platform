@@ -2,18 +2,28 @@
 
 ## Implemented scope
 
-Milestones 1 and 2 still contain exactly two business tables through immutable Flyway migrations:
+Milestones 1-3 contain four business tables through immutable Flyway migrations:
 
 - `V1__create_sys_user.sql`
 - `V2__create_dataset.sql`
 - `V3__add_user_auth_version.sql`
+- `V4__create_track_file.sql`
+- `V5__create_track_point.sql`
 
-Flyway also owns `flyway_schema_history`. No role, file, track-point, analysis, task, interval, report, audit, or outbox table exists yet.
+Flyway also owns `flyway_schema_history`. No role, analysis, task, interval, report, audit, or outbox table exists yet.
 
 ```mermaid
 erDiagram
     SYS_USER ||--o{ DATASET : owns
+    DATASET ||--o{ TRACK_FILE : contains
+    TRACK_FILE ||--o{ TRACK_POINT : parses_to
 ```
+
+## `track_file` and `track_point`
+
+`track_file` stores immutable upload identity (`dataset_id`, sanitized `original_name`, private `object_name`, SHA-256, size and source) plus the guarded `UPLOADED`/`PARSING`/`PARSED`/`FAILED` parse state, point count, safe error, version and UTC timestamps. Object names are unique and `(dataset_id, sha256)` is the final deduplication defense. The owner page index is `(dataset_id, created_at DESC, id DESC)`.
+
+`track_point` stores `track_file_id`, one-based `sequence_no`, `time_value` and the six true/track coordinates plus creation time. `(track_file_id, sequence_no)` is unique and `(track_file_id, time_value)` supports ordered access. It intentionally has no position-error or analysis-result column; all seven doubles are checked for finiteness before insertion.
 
 ## Common rules
 
@@ -57,7 +67,7 @@ erDiagram
 
 ## Verified behavior
 
-MySQL 8.4 Testcontainers verifies empty-schema V1-V3 migration, v2-to-v3 forward upgrade, repeat migration, checksums, `auth_version` default/NOT NULL behavior, primary/unique/foreign/check constraints, index order, authentication/logout behavior, owner-scoped dataset CRUD/pagination/search, logical deletion, optimistic locking, UTC filling, test transaction rollback, and BlockAttack behavior.
+MySQL 8.4 Testcontainers verifies empty-schema V1-V5 migration, V2-to-V3 and V3-to-V5 forward upgrades, repeat migration, checksums, `auth_version` default/NOT NULL behavior, track-file/point metadata and constraints, index order, authentication/logout behavior, owner-scoped dataset and track-file CRUD/pagination/search, logical deletion, optimistic locking, UTC filling, test transaction rollback, and BlockAttack behavior.
 
 The integration suite executes the owner pagination SQL with `EXPLAIN` and asserts that a plan is returned. It deliberately does not assert the optimizer's selected access path on the tiny fixture and makes no performance claim.
 
@@ -65,4 +75,4 @@ The integration suite executes the owner pagination SQL with `EXPLAIN` and asser
 
 Application-service public use cases own `@Transactional`; controllers and mappers do not. Runtime exceptions roll back by default, checked exceptions require deliberate conversion or `rollbackFor`, and external MinIO/RabbitMQ calls must not be held inside long database transactions.
 
-`dataset_file`, `track_point`, analysis/task/result/interval tables, reports, roles, audit logs, and Outbox are deferred until their business milestones define real fields and query paths. Transactional Outbox remains outside the first release.
+Analysis/task/result/interval tables, reports, roles, audit logs, and Outbox are deferred until their business milestones define real fields and query paths. Transactional Outbox remains outside the first release.

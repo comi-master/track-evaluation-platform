@@ -20,6 +20,23 @@ spring:
     validate-on-migrate: true
     clean-disabled: true
     out-of-order: false
+  servlet:
+    multipart:
+      max-file-size: ${TRACK_FILE_MAX_SIZE_BYTES:20971520}B
+      max-request-size: ${TRACK_REQUEST_MAX_SIZE_BYTES:22020096}B
+
+storage:
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://127.0.0.1:9000}
+    access-key: ${MINIO_ROOT_USER}
+    secret-key: ${MINIO_ROOT_PASSWORD}
+    bucket: ${MINIO_BUCKET:track-files}
+
+track:
+  file:
+    max-size-bytes: ${TRACK_FILE_MAX_SIZE_BYTES:20971520}
+    max-rows: ${TRACK_FILE_MAX_ROWS:200000}
+    batch-size: ${TRACK_FILE_BATCH_SIZE:500}
 
 security:
   jwt:
@@ -63,7 +80,7 @@ management:
 info:
   application:
     name: ${spring.application.name}
-    milestone: 2
+    milestone: 3
 
 logging:
   pattern:

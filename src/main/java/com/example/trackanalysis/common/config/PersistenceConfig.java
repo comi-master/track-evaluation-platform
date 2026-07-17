@@ -14,7 +14,8 @@ import org.springframework.context.annotation.Profile;
 @Profile("!no-persistence")
 @MapperScan({
   "com.example.trackanalysis.user.infrastructure.persistence",
-  "com.example.trackanalysis.dataset.infrastructure.persistence"
+  "com.example.trackanalysis.dataset.infrastructure.persistence",
+  "com.example.trackanalysis.track.infrastructure.persistence"
 })
 public class PersistenceConfig {
 

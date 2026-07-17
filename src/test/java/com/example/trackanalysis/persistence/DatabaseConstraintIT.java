@@ -27,7 +27,9 @@ class DatabaseConstraintIT extends MySqlIntegrationTestSupport {
             ORDER BY table_name
             """,
             String.class);
-    assertThat(tables).containsExactly("dataset", "flyway_schema_history", "sys_user");
+    assertThat(tables)
+        .containsExactly(
+            "dataset", "flyway_schema_history", "sys_user", "track_file", "track_point");
 
     Map<String, Map<String, Object>> userColumns = columnsByName("sys_user");
     assertThat(userColumns)
@@ -178,6 +180,63 @@ class DatabaseConstraintIT extends MySqlIntegrationTestSupport {
                     2))
         .isInstanceOf(DataAccessException.class)
         .hasRootCauseInstanceOf(java.sql.SQLException.class);
+  }
+
+  @Test
+  void trackFileAndPointConstraintsRejectInvalidAndDuplicateData() {
+    insertUser("track-constraint-owner");
+    Long userId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM sys_user WHERE username = ?", Long.class, "track-constraint-owner");
+    jdbcTemplate.update("INSERT INTO dataset (user_id, name) VALUES (?, ?)", userId, "tracks");
+    Long datasetId =
+        jdbcTemplate.queryForObject("SELECT id FROM dataset WHERE user_id = ?", Long.class, userId);
+    jdbcTemplate.update(
+        """
+        INSERT INTO track_file
+        (dataset_id, original_name, object_name, sha256, file_size, track_source, parse_status)
+        VALUES (?, 'one.csv', '1/1/one.csv', ?, 10, 'RADAR', 'UPLOADED')
+        """,
+        datasetId,
+        "a".repeat(64));
+    Long fileId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM track_file WHERE dataset_id = ?", Long.class, datasetId);
+
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    """
+                    INSERT INTO track_file
+                    (dataset_id, original_name, object_name, sha256, file_size, track_source, parse_status)
+                    VALUES (?, 'two.csv', '1/1/two.csv', ?, 10, 'OTHER', 'UPLOADED')
+                    """,
+                    datasetId,
+                    "a".repeat(64)))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    "UPDATE track_file SET parse_status = 'UNKNOWN' WHERE id = ?", fileId))
+        .isInstanceOf(DataAccessException.class);
+
+    jdbcTemplate.update(
+        """
+        INSERT INTO track_point
+        (track_file_id, sequence_no, time_value, true_x, true_y, true_z, track_x, track_y, track_z)
+        VALUES (?, 1, 1, 2, 3, 4, 5, 6, 7)
+        """,
+        fileId);
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    """
+                    INSERT INTO track_point
+                    (track_file_id, sequence_no, time_value, true_x, true_y, true_z, track_x, track_y, track_z)
+                    VALUES (?, 1, 2, 2, 3, 4, 5, 6, 7)
+                    """,
+                    fileId))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   private Map<String, Map<String, Object>> columnsByName(String tableName) {

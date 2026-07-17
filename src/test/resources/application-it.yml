@@ -8,3 +8,11 @@ spring:
   test:
     mockmvc:
       print: none
+
+storage:
+  minio:
+    enabled: false
+    endpoint: http://127.0.0.1:9000
+    access-key: test-access
+    secret-key: test-secret
+    bucket: track-files-test

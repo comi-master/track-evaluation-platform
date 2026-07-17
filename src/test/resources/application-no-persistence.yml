@@ -6,6 +6,13 @@ spring:
       - com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration
       - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
 
+storage:
+  minio:
+    enabled: false
+    endpoint: http://127.0.0.1:9000
+    access-key: test-access
+    secret-key: test-secret
+    bucket: track-files-test
 security:
   jwt:
     secret: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=

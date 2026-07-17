@@ -73,3 +73,15 @@ This file grows only from implemented and verified project evidence. Resume desc
 **Fourth follow-up — how are concurrent edits handled?** Updates require the client-visible `version` and condition on it in SQL. A zero-row update is distinguished from invisibility: an existing owned resource produces 409 for a stale version, while an absent or foreign resource produces 404.
 
 **Project evidence:** `JwtAuthenticationFilter`, `JwtService`, `AuthApplicationService`, owner-scoped `DatasetMapper` SQL, V3 migration, ordinary security/service tests, and MySQL 8.4 API integration tests.
+
+## Milestone 3: Why split upload from parsing?
+
+**Base answer:** Upload establishes durable raw input and immutable metadata; parsing is a separate retryable state transition. A successful upload therefore remains useful even when CSV validation later fails.
+
+**How is memory bounded?** The multipart input is copied with an 8 KiB buffer to a temporary file while hashing, MinIO is streamed in both directions, Commons CSV iterates records, and MyBatis writes configurable 500-row batches. The complete upload is never retained in a JVM byte array.
+
+**How are cross-system failures handled?** MinIO and MySQL cannot share the application's local transaction. If metadata insertion fails after upload, the application best-effort removes only the newly generated object. Parsing downloads outside the database transaction, rolls back all point batches on failure, then marks the file `FAILED` in a short transaction. This is explicit compensation, not a distributed-consistency claim or an Outbox.
+
+**How are IDOR and parser leakage prevented?** File and point SQL joins the file to its dataset and authenticated `user_id`; foreign and absent IDs both produce 404. Parser errors expose a bounded line number and reason without logging or storing the row content.
+
+**Project evidence:** Flyway V4/V5, `TrackFileApplicationService`, `CsvTrackParser`, private MinIO adapter, `TrackPointMapper.xml`, ordinary tests and dual-container `TrackFileApiIT`.

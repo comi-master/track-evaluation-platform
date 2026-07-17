@@ -61,4 +61,17 @@ All dataset SQL includes the current `user_id` and `deleted = 0`. Another user's
 | `INFRASTRUCTURE_ERROR` | 503 | Required dependency unavailable |
 | `INTERNAL_ERROR` | 500 | Safe generic response; full cause stays in logs |
 
-Ping, Actuator, authentication, datasets and OpenAPI are implemented. Files, tasks, points, analysis results, intervals and reports are planned for later milestones and must not be treated as available APIs. There is no Refresh Token, Redis login state or RBAC API.
+Ping, Actuator, authentication, datasets, track-file upload/list/detail/parse/points, and OpenAPI are implemented. Tasks, analysis results, intervals and reports are planned for later milestones and must not be treated as available APIs. There is no Refresh Token, Redis login state or RBAC API.
+# Milestone 3 track-file API
+
+All endpoints below require `Authorization: Bearer <access-token>`. Missing resources and resources owned by another user both return `404`.
+
+| Method and path | Input | Success |
+| --- | --- | --- |
+| `POST /api/v1/datasets/{datasetId}/track-files` | multipart `file` and `trackSource` (`RADAR`, `INFRARED`, `FUSION`, `ALGORITHM`, `OTHER`) | `201`, metadata in `UPLOADED` state |
+| `GET /api/v1/datasets/{datasetId}/track-files` | `page=1`, `size=20`, optional `trackSource`, `parseStatus` | owner-scoped newest-first page |
+| `GET /api/v1/track-files/{fileId}` | path ID | safe metadata; no object key or local path |
+| `POST /api/v1/track-files/{fileId}/parse` | path ID | synchronously parses `UPLOADED` or `FAILED` files |
+| `GET /api/v1/track-files/{fileId}/points` | `page=1`, `size=100` (maximum 1000) | sequence-ascending raw seven-column points |
+
+The upload accepts a non-empty `.csv` name (case-insensitive) up to the configured 20 MiB default, computes SHA-256 while streaming through a private temporary file, and rejects duplicate content within one dataset with `409`. Parsing accepts exactly `time,true_x,true_y,true_z,track_x,track_y,track_z`, including an optional UTF-8 BOM. It rejects malformed UTF-8, invalid headers or columns, empty/non-finite/non-numeric values, non-increasing time, and rows beyond the configured 200,000 default. Safe errors include only the CSV line number and reason, never the original row.

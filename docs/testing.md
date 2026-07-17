@@ -48,6 +48,13 @@ Every IT uses a JUnit-managed Testcontainer with independent credentials and dat
 - `AuthenticationApiIT` verifies registration normalization, permanent uniqueness, BCrypt storage, uniform login failures, disabled users, protected API access, invalid/expired JWTs, logout invalidation, and OpenAPI exposure.
 - `DatasetApiIT` verifies authenticated CRUD, fixed pagination order, bounded keyword search, logical deletion, optimistic conflict, and 404 owner isolation for read/update/delete.
 
+## Milestone 3 upload and parsing suite
+
+- Ordinary tests cover safe `.csv` names, size bounds, streamed SHA-256/object-key construction and duplicate/general database-failure compensation, plus normal/BOM/quoted CSV, empty files, exact headers and columns, empty/non-numeric/NaN/infinity values, strict time order, maximum rows, UTF-8 errors and safe line numbers. Temporary-file cleanup is implemented in both upload and parse `finally` paths and is exercised by the integration lifecycle.
+- `FlywayMigrationIT` verifies V1-V5 from an empty MySQL 8.4 database; `V3ToV5MigrationIT` verifies the forward upgrade preserves existing users and datasets.
+- `DatabaseConstraintIT` verifies the new table metadata, dataset/hash and point-sequence uniqueness, state checks and foreign keys.
+- `TrackFileApiIT` starts independent MySQL 8.4 and MinIO containers and verifies real bucket initialization, object upload/read, SHA-256 deduplication, the complete HTTP flow, a 501-row cross-batch parse, actual XML mapper loading, pagination order, invalid-middle-row rollback, `FAILED` state and owner isolation. It never connects to local Compose data.
+
 ## Failure scenarios by roadmap
 
 - Milestone 1: migration, mapper SQL, rollback, uniqueness, optimistic/conditional updates.
@@ -59,7 +66,7 @@ Every IT uses a JUnit-managed Testcontainer with independent credentials and dat
 
 No later failure scenario is marked tested until its test has actually run.
 
-The active test route follows milestones 0-6. Milestone 2 verification is complete; milestone 3 has not started. Transactional Outbox recovery and Prometheus/Grafana platform tests remain outside the first-release suite.
+The active test route follows milestones 0-6. Milestones 0-3 verification is complete; milestone 4 has not started. Transactional Outbox recovery and Prometheus/Grafana platform tests remain outside the first-release suite.
 
 ## Recorded milestone 0 result
 
@@ -72,3 +79,7 @@ On 2026-07-16, Java 17 ordinary verification ran 19 tests without Docker, and `c
 ## Recorded milestone 2 result
 
 On 2026-07-17, Java 17 ordinary verification ran 49 tests without Docker. After independent-review fixes, `clean verify -Pit` ran those 49 ordinary tests plus 31 MySQL 8.4 integration tests; both layers had 0 failures, 0 errors, and 0 skipped tests. Testcontainers were removed after execution and did not use the local Compose database. The post-review Compose smoke test passed registration, login, current user, dataset create/read/update/page, logout invalidation, health, request ID equality, sensitive-log scanning, and process shutdown.
+
+## Recorded milestone 3 result
+
+On 2026-07-17, Java 17 ordinary verification ran 63 tests without Docker; `clean verify -Pit` ran those 63 plus 36 isolated MySQL 8.4/MinIO integration tests, all with 0 failures, 0 errors, and 0 skipped. Flyway V1-V5, V3-to-V5 forward migration, XML batch insertion, real object upload/read, 501-row parsing, rollback after a post-batch invalid row, FAILED state, pagination and owner isolation passed. Compose smoke testing passed the complete local upload/parse flow, duplicate and invalid cases, request ID and sensitive-log checks, exact temporary-record/object cleanup, and clean application shutdown. Independent review completed once with 0 Critical, 0 High, 5 Medium and 2 Low; all Medium findings were fixed and verification rerun.

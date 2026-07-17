@@ -1,8 +1,8 @@
 # Architecture
 
-## Current milestone 2
+## Current milestone 3 acceptance
 
-The application remains one Spring Boot process. Spring Security authenticates one signed JWT Access Token, reloads the current user for every protected request, and rejects deleted, disabled, or invalidated accounts. Application services own transactions; feature-local MyBatis-Plus mappers include ownership in dataset SQL. No Refresh Token, Redis login state, RBAC, upload, analysis, messaging, cache, report, or production XML mapper exists.
+The application remains one Spring Boot process. Spring Security authenticates one signed JWT Access Token, reloads the current user for every protected request, and rejects deleted, disabled, or invalidated accounts. Application services own transactions; feature-local MyBatis-Plus mappers include ownership in SQL. MinIO-backed track-file upload and synchronous CSV parsing are implemented; analysis, messaging, cache and reports remain deferred.
 
 ```mermaid
 flowchart TD
@@ -87,7 +87,7 @@ Spring Security runs statelessly with CSRF, form login and HTTP Basic disabled. 
 
 ## Delivery boundary
 
-The active route contains seven milestones numbered 0-6. Milestones 0, 1 and 2 are complete; milestone 3 has not started. The first release remains a modular monolith and prioritizes a demonstrable upload-analysis-report business closure over infrastructure breadth. The former 0-12 route is historical. Transactional Outbox, microservice decomposition, and a Prometheus/Grafana platform are future extensions only.
+The active route contains seven milestones numbered 0-6. Milestones 0-3 are complete; milestone 4 has not started. The first release remains a modular monolith and prioritizes a demonstrable upload-analysis-report business closure over infrastructure breadth. The former 0-12 route is historical. Transactional Outbox, microservice decomposition, and a Prometheus/Grafana platform are future extensions only.
 
 ## Dependency rules
 
@@ -96,3 +96,9 @@ The active route contains seven milestones numbered 0-6. Milestones 0, 1 and 2 a
 3. Domain rules do not import MinIO, Redis, RabbitMQ, servlet, or mapper SDKs.
 4. Infrastructure adapters implement explicit ports only when isolation has value.
 5. No external network call is held inside a long database transaction.
+
+## Implemented milestone 3 ingestion flow
+
+Upload and parse are deliberately separate synchronous APIs. Upload streams the multipart body to a permission-controlled temporary file while calculating SHA-256, writes the raw object under `{userId}/{datasetId}/{uuid}.csv`, then inserts immutable `track_file` metadata. If the database insert fails, only the newly written object is removed on a best-effort basis.
+
+Parse first atomically claims `UPLOADED` or `FAILED` as `PARSING`. The MinIO object is copied to a bounded temporary file outside a database transaction. A single database transaction then parses that local file incrementally, writes 500-row MyBatis XML batches, and marks `PARSED`; any row or batch failure rolls back every point. A separate short transaction marks `FAILED` with a bounded safe summary. MySQL and MinIO do not share a local transaction, this is minimal compensation rather than distributed atomicity, and no Outbox is implemented.

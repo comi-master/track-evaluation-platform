@@ -2,7 +2,7 @@
 
 `track-analysis-platform` 是一个面向 Java 后端工程实践的模块化单体项目。目标业务闭环是：安全地接收七列航迹 CSV，流式解析和批量入库，异步计算三维误差与连续异常区间，并管理分析结果和模板报告。
 
-> 当前状态：唯一有效路线共七个里程碑（0—6）。里程碑 0、1、2 已完成；认证与数据集管理已通过 Java 17 普通测试、MySQL 8.4 Testcontainers、Compose 应用烟测和独立审查。当前仍只有 `sys_user`、`dataset` 两张业务表；文件上传、航迹分析、消息、缓存和报告业务尚未实现，里程碑 3 尚未开始。
+> 当前状态：唯一有效路线共七个里程碑（0—6）。里程碑 0—3 已完成，里程碑 4 尚未开始。当前已实现 CSV 上传、MinIO 私有原文件存储、SHA-256 去重、固定七列流式解析和 `track_point` 批量入库；误差/RMSE、异常区间、消息、缓存和报告业务尚未实现。
 
 ## 当前功能
 
@@ -10,13 +10,13 @@
 - `X-Request-Id`：接受安全的调用方 ID，缺失或不安全时生成 UUID，并写入响应头和 MDC。
 - 全局异常映射：稳定业务错误码、合理 HTTP 状态、安全的未知错误响应。
 - Actuator：health、info、metrics、Prometheus 端点基础配置。
-- Compose 基础依赖定义：MySQL、Redis、RabbitMQ、MinIO；当前只有 MySQL 接入应用持久化。
+- Compose 基础依赖定义：MySQL、Redis、RabbitMQ、MinIO；当前 MySQL 和 MinIO 已接入里程碑 3 业务链路。
 - Flyway 管理的 `sys_user`、`dataset` schema，以及 MyBatis-Plus Mapper、分页、逻辑删除、乐观锁、UTC 自动填充和全表操作防护。
 - 注册、登录、当前用户和全局退出接口；BCrypt 密码哈希、Spring Security 无状态 Bearer 认证，以及可配置的 JWT Access Token。
 - 当前用户范围内的数据集创建、详情、分页/名称搜索、乐观锁更新和逻辑删除；所有权直接进入 Mapper SQL 条件。
 - Springdoc OpenAPI JSON 和 Swagger UI，包含 Bearer Token 安全方案。
 
-当前范围边界：只有单一 Access Token，没有 Refresh Token、Redis 登录态、RBAC 或多设备会话；没有生产 XML Mapper，也没有文件上传、航迹分析、RabbitMQ、Redis 业务缓存或报告功能；里程碑 3 尚未开始。
+当前范围边界：只有单一 Access Token，没有 Refresh Token、Redis 登录态、RBAC 或多设备会话；已有航迹点批量写入的生产 MyBatis XML，但没有误差/RMSE、异常区间等航迹分析，也没有 RabbitMQ、Redis 业务缓存或报告功能；里程碑 4 尚未开始。
 
 ## 技术基线
 
@@ -26,7 +26,7 @@
 - JUnit 5, MockMvc, AssertJ, Testcontainers, JaCoCo, Spotless
 - MySQL 8.4, Redis 8.x, RabbitMQ 4.x, MinIO through Docker Compose
 
-Redis、RabbitMQ 和 MinIO 应用依赖仍按各自里程碑推迟。当前没有生产 MyBatis XML；首个真实 XML 预计随批量航迹点写入引入。
+MinIO 已用于私有原始 CSV 存储；Redis 和 RabbitMQ 应用依赖仍按后续里程碑推迟。`TrackPointMapper.xml` 是首个生产 MyBatis XML，以 `foreach` 实现可配置批量写入。
 
 ## Architecture
 
@@ -39,7 +39,7 @@ flowchart LR
     Adapters --> Infra["MySQL / Redis / RabbitMQ / MinIO"]
 ```
 
-The current code contains the cross-cutting HTTP foundation, stateless authentication, and owner-scoped dataset use cases. See [docs/architecture.md](docs/architecture.md) for current-versus-target detail.
+The current code contains the cross-cutting HTTP foundation, stateless authentication, owner-scoped datasets, and the upload-to-streaming-ingestion path. See [docs/architecture.md](docs/architecture.md) for current-versus-target detail.
 
 ## Core target flow
 
@@ -99,8 +99,8 @@ All middleware ports bind to `127.0.0.1` by default through `BIND_ADDRESS`. Over
 | MySQL | 3306 | `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD` |
 | Redis | 6379 | `REDIS_PASSWORD` |
 | RabbitMQ | 5672, 15672 | `RABBITMQ_DEFAULT_PASS` |
-| MinIO | 9000, 9001 | `MINIO_ROOT_PASSWORD` |
-| Application | 8080 | `MYSQL_HOST`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_PORT`, `JWT_SECRET`, `JWT_ACCESS_TTL_MINUTES`, `JWT_ISSUER` |
+| MinIO | 9000, 9001 | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` |
+| Application | 8080 | MySQL/JWT variables plus `MINIO_ENDPOINT`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_BUCKET`; optional `TRACK_FILE_MAX_SIZE_BYTES`, `TRACK_FILE_MAX_ROWS`, `TRACK_FILE_BATCH_SIZE` |
 
 ## API documentation
 
@@ -126,8 +126,8 @@ JaCoCo HTML output is generated under `target/site/jacoco/`. Test and coverage r
 On 2026-07-17, `java` and Maven Wrapper both used JetBrains OpenJDK 17.0.14 from `D:\java\JDK17`. Maven 3.9.11 compiled with `--release 17` and produced Java 17 class-file version 61.
 
 - `spotless:apply` and `spotless:check`: passed.
-- `clean verify`: passed without starting Docker; 49 tests, 0 failures, 0 errors, 0 skipped.
-- `clean verify -Pit`: passed with MySQL 8.4 Testcontainers; 49 ordinary tests plus 31 integration tests, 0 failures, 0 errors, 0 skipped.
+- `clean verify`: passed without starting Docker; 63 tests, 0 failures, 0 errors, 0 skipped.
+- `clean verify -Pit`: passed with isolated MySQL 8.4 and MinIO Testcontainers; 63 ordinary tests plus 36 integration tests, 0 failures, 0 errors, 0 skipped.
 - Dependency tree: completed without an additional raw MyBatis starter or unresolved version conflict. Flyway was minimally overridden within major version 11 because Boot's managed 11.7.2 warned that MySQL 8.4 had not been tested; 11.20.1 passed the complete suite without that warning.
 - Packaged application smoke test on JDK 17: local MySQL reached Flyway V3, and the complete register/login/current-user/dataset CRUD-page/logout flow passed. An old token returned 401 after logout, `/actuator/health` returned `UP`, request ID matched in header and body, the process stopped cleanly, and checked logs contained no password, JWT secret, or complete token.
 - Docker: Desktop 4.82.0, Engine 29.6.1 on Linux/amd64, and Compose v5.3.0. A forced recreation preserved all named volumes; MySQL, Redis, RabbitMQ, and MinIO all reached `healthy`, passed service-specific connection or endpoint checks, and published ports only on `127.0.0.1`. MySQL and Redis health checks authenticate through process environment variables rather than password arguments. Redis validates its password, creates a `600 redis:redis` temporary configuration on every start, and keeps the real value out of container command metadata, PID 1 arguments, health-check metadata, and logs.
@@ -162,9 +162,9 @@ No performance measurements exist yet. Basic, honest same-machine measurements b
 
 ## Known limitations
 
-- Milestone 2 is complete; milestones 3-6 have not started, and this is not yet the full business product.
+- Milestones 0-3 are complete; milestones 4-6 have not started, so this is not yet the full business product.
 - The Maven Wrapper works without global Maven. The supported and verified runtime is JDK 17; an installed JDK 25 is not used by the project acceptance workflow.
-- Compose services other than MySQL remain infrastructure-only. The Spring Boot application currently uses MySQL persistence but has no Redis, RabbitMQ, or MinIO business integration.
+- The Spring Boot application currently uses MySQL persistence and MinIO object storage. Redis and RabbitMQ remain infrastructure-only until milestone 5.
 - Docker Hub can occasionally return a transient `EOF`; use a finite retry and inspect Docker Desktop proxy/network settings if it persists.
 - A Prometheus/Grafana monitoring platform is outside the first release. Existing Actuator/Micrometer endpoint support does not mean that platform has been implemented.
 

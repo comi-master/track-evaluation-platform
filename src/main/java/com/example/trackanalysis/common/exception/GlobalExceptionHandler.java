@@ -16,6 +16,8 @@ import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -55,7 +57,12 @@ public class GlobalExceptionHandler {
     return response(ErrorCode.INVALID_ARGUMENT, message, request);
   }
 
-  @ExceptionHandler({ConstraintViolationException.class, HttpMessageNotReadableException.class})
+  @ExceptionHandler({
+    ConstraintViolationException.class,
+    HttpMessageNotReadableException.class,
+    MethodArgumentTypeMismatchException.class,
+    MaxUploadSizeExceededException.class
+  })
   public ResponseEntity<Result<Void>> handleInvalidRequest(
       Exception exception, HttpServletRequest request) {
     log.debug("Request validation failed", exception);

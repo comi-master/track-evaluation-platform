@@ -103,3 +103,31 @@ This file grows only from implemented and verified project evidence. Resume desc
 **Why not claim exactly once?** RabbitMQ is at-least-once and task creation publishes after its database commit. Publisher confirms detect many failures but do not remove every crash window. Duplicate work is suppressed by state; a Transactional Outbox would close the creation dual-write gap but is intentionally outside this release.
 
 **How is Redis safe?** Ownership is checked first, keys include `userId`, values are explicit JSON DTOs, and only latest/comparison summaries are cached. Successful writes invalidate both affected views after commit. Redis failures degrade to database reads and do not reverse committed business data.
+# First-release presentation
+
+## One minute
+
+I built a Java 17 modular-monolith backend for multi-source track-quality analysis. It streams fixed-schema CSV into MySQL while retaining private originals in MinIO, computes 3D error/RMSE/population standard deviation and abnormal intervals, supports synchronous and RabbitMQ asynchronous execution, and caches only repeated summary queries in Redis. The final output is an immutable, self-contained HTML comparison report. Ownership is enforced in SQL boundaries, and the delivery is verified with unit, MockMvc, Testcontainers and Docker smoke tests.
+
+## Three minutes
+
+The project avoids being a generic CRUD system by centering on a measurable data pipeline. Uploads are hashed and stored privately, CSV rows are parsed as a stream and inserted in bounded batches, and analysis scans points with keyset pagination. Welford's algorithm keeps the statistical state bounded. Asynchronous tasks use durable RabbitMQ topology, manual ACK, bounded retry/DLQ and database-state idempotency; Redis uses Cache-Aside only for latest result and dataset comparison. Reports select each file's latest analysis, escape every user/file string, build HTML outside a database transaction, then persist a short immutable snapshot. The application remains a modular monolith because one deployable and one transactional database fit the first release better than operationally expensive artificial microservices.
+
+## Resume bullets
+
+- Designed and implemented a Java 17/Spring Boot modular-monolith track-analysis pipeline with streamed CSV parsing, 500-row MyBatis XML batch inserts, MinIO private objects and owner-scoped MySQL queries.
+- Implemented 3D error, RMSE, population standard deviation and continuous abnormal intervals using bounded keyset scans and Welford state; added synchronous and RabbitMQ asynchronous workflows with retry, DLQ and idempotency.
+- Added Redis Cache-Aside for latest/comparison summaries and secure immutable HTML reports, verified through Java 17 unit/MockMvc/Testcontainers and Docker acceptance evidence.
+
+## Frequent follow-ups
+
+- **Why MyBatis-Plus and XML?** Simple entity operations remain concise; access-path-sensitive keyset and batch SQL stays explicit and integration-tested.
+- **How are MinIO and MySQL kept consistent?** There is no false cross-system transaction claim: upload uses compensating deletion on database failure, records safe failure state, and tests partial failures.
+- **How is isolation enforced?** User ID joins/conditions are applied in Mapper queries, and missing/foreign resources intentionally share 404.
+- **How does logout invalidate JWT?** A database `auth_version` is embedded in the token and incremented at logout; old tokens fail validation.
+- **Why keyset over OFFSET?** Point analysis advances a stable sequence cursor, avoiding repeated skipping as tables grow.
+- **Retry/idempotency?** Manual ACK plus bounded retry/DLQ handles delivery; task state transitions prevent duplicate successful analysis.
+- **Why no Outbox?** The first release accepts the documented publish gap and bounded recovery cost; Outbox complexity was not justified by the scope.
+- **What is cached?** Only latest result and dataset comparison; history, raw points and immutable reports are not cached.
+- **Why HTML?** It is self-contained, printable and downloadable without a large export stack; all untrusted text is escaped.
+- **Limits/extensions?** No significance testing, frontend, PDF, AI, multi-tenancy or production SLO claim. Future work can add those after measured need, without prematurely splitting services.

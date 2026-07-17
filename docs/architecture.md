@@ -114,3 +114,75 @@ Task creation commits a `PENDING` database row before publishing `{schemaVersion
 Temporary failures conditionally restore `PENDING` and publish to a TTL retry queue until `max_attempts`; exhausted or permanent failures become `FAILED` and are routed to the dead queue. Deliveries for `SUCCESS` or `RUNNING` do not create a second result. This is database-state idempotency, not exactly-once transport. Publishing still has the normal database/message dual-write window; Transactional Outbox is an explicitly deferred extension.
 
 Redis stores explicit JSON response DTOs without polymorphic default typing. Keys include `userId`; ownership is checked in MySQL before lookup. Latest results expire after 10 minutes and comparisons after 5 minutes. Cache read/write/delete failures are availability degradations and never roll back committed analysis data.
+# Final first-release flows
+
+```mermaid
+flowchart LR
+  Client["Swagger / API client"] --> App["Java 17 modular monolith"]
+  App --> MySQL[("MySQL V1-V9")]
+  App --> MinIO[("Private CSV objects")]
+  App --> Rabbit["RabbitMQ main / retry / DLQ"]
+  App --> Redis["Redis summary cache"]
+```
+
+```mermaid
+flowchart TB
+  Auth["auth/user"] --> Dataset["dataset"] --> Track["track/storage"] --> Analysis["analysis"]
+  Analysis --> Task["task/messaging"]
+  Analysis --> Report["report"]
+  Common["common API, errors, requestId, config"] --> Auth
+  Common --> Dataset
+  Common --> Track
+  Common --> Analysis
+  Common --> Task
+  Common --> Report
+```
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant A as Application
+  participant O as MinIO
+  participant D as MySQL
+  C->>A: multipart CSV
+  A->>O: stream private object
+  C->>A: parse
+  A->>O: stream object
+  loop bounded batches
+    A->>D: insert track points
+  end
+```
+
+```mermaid
+flowchart LR
+  Sync["Synchronous request"] --> Scan["Keyset point scan"] --> Stats["Welford + intervals"] --> Result["Immutable result"]
+  Publish["Create async task"] --> Rabbit --> Consume["Manual ACK consumer"] --> Scan
+  Consume --> Retry["Bounded retry / DLQ"]
+```
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant A as Analysis service
+  participant R as Redis
+  participant D as MySQL
+  C->>A: latest/comparison
+  A->>R: get
+  alt cache miss or unavailable
+    A->>D: owner-scoped query
+    A->>R: best-effort put with TTL
+  end
+  A-->>C: result
+```
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant A as Report service
+  participant D as MySQL
+  C->>A: generate report
+  A->>D: verify owner + latest result per file
+  A->>A: escape text and render HTML outside transaction
+  A->>D: short transaction inserts immutable snapshot
+  A-->>C: report metadata
+```

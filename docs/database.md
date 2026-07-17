@@ -92,3 +92,6 @@ V7 creates `abnormal_interval` with ordered sequence/time bounds, point count, p
 V8 creates `analysis_task`. It references one `track_file` and, only after success, one immutable `analysis_result`. Checks constrain threshold, attempts, status and the invariant that only `SUCCESS` may carry a result ID. `(track_file_id, created_at DESC, id DESC)` supports owner-scoped history; `(status, updated_at, id)` supports operational state access. State transitions use conditional updates so duplicate deliveries cannot claim a completed or already-running task. Both foreign keys use `RESTRICT`; task error text is capped at 500 characters and contains safe summaries only.
 
 Migration acceptance covers empty V1—V8 and V5→V8 forward upgrade while preserving existing user, dataset, file and point rows.
+# Milestone 6 database addition
+
+Flyway V9 adds immutable `analysis_report(id,dataset_id,title,report_type,source_file_count,content_html,created_at)`. Its dataset foreign key is `RESTRICT`; checks enforce nonblank title/content, positive source count, and the first-release `DATASET_COMPARISON` type. History uses `(dataset_id,created_at DESC,id DESC)`. Reports have neither logical deletion nor version/update fields. V1–V9 are append-only migrations; analysis results and reports are immutable records.

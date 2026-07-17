@@ -30,6 +30,7 @@ class DatabaseConstraintIT extends MySqlIntegrationTestSupport {
     assertThat(tables)
         .containsExactly(
             "abnormal_interval",
+            "analysis_report",
             "analysis_result",
             "analysis_task",
             "dataset",

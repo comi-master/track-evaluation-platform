@@ -6,5 +6,7 @@
 .DS_Store
 Thumbs.db
 target/
+demo-output/
+performance-output/
 .tools/
 dependency-reduced-pom.xml

@@ -1,0 +1,8 @@
+.git
+.env
+.idea
+.vscode
+target
+*.log
+demo-output
+performance-output

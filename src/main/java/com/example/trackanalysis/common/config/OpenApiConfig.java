@@ -12,7 +12,9 @@ import org.springframework.context.annotation.Configuration;
         @Info(
             title = "Track Analysis Platform API",
             version = "v1",
-            description = "Milestone 2 authentication and user-owned dataset management API"))
+            description =
+                "First-release API for authentication, datasets, track ingestion, analysis,"
+                    + " asynchronous tasks and HTML reports"))
 @SecurityScheme(
     name = "bearerAuth",
     type = SecuritySchemeType.HTTP,

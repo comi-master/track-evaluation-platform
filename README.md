@@ -33,13 +33,15 @@ docker compose -f compose.yaml -f compose.app.yaml ps
 
 注册/登录 → 创建数据集 → 上传三个来源 CSV → 流式解析与批量入库 → 同步或异步分析 → latest/comparison 查询 → 生成报告 → 查询历史 → 在线查看或下载 HTML。
 
-示例位于 `samples/`，全部是人工构造的非敏感小数据。执行完整演示：
+`samples/` 是人工构造的非敏感小样例。可重复的完整演示会用固定种子自动生成三份 2000 点仿真航迹，然后真实执行上传、解析、同步/异步分析、Redis 缓存和 HTML 报告链路：
 
 ```powershell
+$env:JAVA_HOME='D:\java\JDK17'
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
 .\scripts\demo.ps1
 ```
 
-脚本不会打印密码、完整 JWT 或 Secret；下载文件写入被忽略的 `demo-output/`。默认保留演示业务记录供检查，不做破坏性清理。
+脚本会按需启动四个 Compose 依赖和本地应用，完成后只停止本次启动的应用进程。它不会打印或保存密码、完整 JWT、Secret，也不会删除数据卷、bucket 或业务记录。生成的 CSV、摘要、日志和报告均写入被 Git 忽略的 `demo-output/`。完整说明见 `docs/demo-guide.md`。
 
 ## 验证
 

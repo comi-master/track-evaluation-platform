@@ -9,6 +9,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
+$utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $utf8WithoutBom
+$OutputEncoding = $utf8WithoutBom
 $startedAt = Get-Date
 $root = Split-Path -Parent $PSScriptRoot
 $out = if ([IO.Path]::IsPathRooted($OutputDirectory)) { $OutputDirectory } else { Join-Path $root $OutputDirectory }
@@ -25,6 +28,36 @@ New-Item -ItemType Directory -Force -Path $out, $reportDirectory | Out-Null
 
 function Write-Step([string]$Message) { Write-Output "[$([DateTime]::UtcNow.ToString('HH:mm:ss')) UTC] $Message" }
 function Invoke-Checked([scriptblock]$Command, [string]$Failure) { & $Command; if ($LASTEXITCODE -ne 0) { throw $Failure } }
+function Get-ComposeServiceRuntimeState([string]$Service) {
+    $containerIds = @(& docker compose --env-file .env ps -q $Service)
+    if ($LASTEXITCODE -ne 0) { throw "Failed to resolve the container for Compose service '$Service'." }
+    $containerIds = @($containerIds | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($containerIds.Count -eq 0) {
+        return [pscustomobject]@{ Service = $Service; ContainerId = $null; Status = 'missing'; Health = $null }
+    }
+    if ($containerIds.Count -ne 1) { throw "Compose service '$Service' resolved to more than one container." }
+
+    $containerId = $containerIds[0]
+    $stateJson = @(& docker inspect --format '{{json .State}}' $containerId)
+    if ($LASTEXITCODE -ne 0) { throw "Failed to inspect the container for Compose service '$Service'." }
+    $stateText = ($stateJson -join '').Trim()
+    if ([string]::IsNullOrWhiteSpace($stateText)) { throw "Docker returned an empty state for Compose service '$Service'." }
+    try { $state = $stateText | ConvertFrom-Json } catch { throw "Docker returned an invalid state for Compose service '$Service'." }
+    $health = if ($null -ne $state.Health) { [string]$state.Health.Status } else { $null }
+    [pscustomobject]@{ Service = $Service; ContainerId = $containerId; Status = [string]$state.Status; Health = $health }
+}
+function Wait-ComposeInfrastructure {
+    $services = @('mysql','redis','rabbitmq','minio')
+    $deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
+    do {
+        $states = @($services | ForEach-Object { Get-ComposeServiceRuntimeState $_ })
+        $ready = @($states | Where-Object { $_.Status -eq 'running' -and ([string]::IsNullOrWhiteSpace($_.Health) -or $_.Health -eq 'healthy') }).Count
+        if ($ready -eq $services.Count) { return $states }
+        Start-Sleep -Seconds 2
+    } while ((Get-Date) -lt $deadline)
+    $summary = ($states | ForEach-Object { "$($_.Service)=$($_.Status)/$(if ($_.Health) { $_.Health } else { 'no-healthcheck' })" }) -join ', '
+    throw "The four infrastructure services did not become healthy within $StartupTimeoutSeconds seconds ($summary)."
+}
 function Import-DotEnv {
     $path = Join-Path $root ".env"
     if (-not (Test-Path $path)) { throw ".env is required. Copy .env.example and replace every placeholder." }
@@ -90,14 +123,7 @@ try {
 
     Write-Step "Starting or reusing MySQL, Redis, RabbitMQ, and MinIO."
     Invoke-Checked { docker compose --env-file .env up -d } "Compose infrastructure failed to start."
-    $deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
-    do {
-        $rows = @(docker compose --env-file .env ps --format json | ConvertFrom-Json)
-        $healthy = @($rows | Where-Object { $_.Service -in @('mysql','redis','rabbitmq','minio') -and $_.Health -eq 'healthy' }).Count
-        if ($healthy -eq 4) { break }
-        Start-Sleep -Seconds 2
-    } while ((Get-Date) -lt $deadline)
-    if ($healthy -ne 4) { throw "The four infrastructure services did not become healthy before timeout." }
+    $infrastructureStates = Wait-ComposeInfrastructure
 
     try { $null = Api GET "/actuator/health" } catch {
         Write-Step "Starting the Spring Boot application."

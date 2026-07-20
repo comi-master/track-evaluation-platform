@@ -51,6 +51,9 @@ Get-Content .env | Where-Object { $_ -match '^[A-Z][A-Z0-9_]*=' } | ForEach-Obje
 
 ## 常见故障
 
+- Windows PowerShell 的外部命令输出可能使用 GBK 等旧代码页；演示脚本只为当前进程设置 UTF-8，不修改系统永久编码。
+- Compose v5 的 `docker compose ps --format json` 是每个服务一个根对象的 JSON Lines，截断字段还可能包含 Unicode 省略号。脚本现在用 `docker compose ps -q` 逐服务定位容器，只解析该容器单一的 `docker inspect` 状态对象。
+- Compose 若报告孤立的 `track-analysis-platform-app-1`，先用 `docker ps -a --filter "name=track-analysis-platform-app-1"` 检查。确认是旧应用容器后，只用 `docker rm -f track-analysis-platform-app-1` 删除它；禁止执行会删除命名数据卷的 `docker compose down -v`。
 - Java 检查失败：确认 `JAVA_HOME` 指向真实 JDK 17；JDK 21/25 不能替代本次验收。
 - Compose 配置失败：检查 `.env` 是否存在、是否仍含占位值以及 Redis 密码是否符合仓库策略。不要输出凭据排查。
 - Docker 不可用：启动 Docker Desktop/Engine 后重试 `docker version`。

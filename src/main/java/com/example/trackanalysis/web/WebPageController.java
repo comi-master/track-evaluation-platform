@@ -106,8 +106,7 @@ public class WebPageController {
   }
 
   @PostMapping("/register")
-  public String register(@Valid RegistrationForm form, BindingResult binding,
-      HttpServletRequest request, Model model) {
+  public String register(@Valid RegistrationForm form, BindingResult binding, Model model) {
     if (!form.password().equals(form.confirmPassword())) {
       binding.rejectValue("confirmPassword", "password.mismatch", "两次输入的密码不一致");
     }

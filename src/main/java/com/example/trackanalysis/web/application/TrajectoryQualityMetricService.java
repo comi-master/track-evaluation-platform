@@ -17,10 +17,6 @@ public class TrajectoryQualityMetricService {
     this.points = points;
   }
 
-  public double continuity(long userId, long fileId) {
-    return metrics(userId, fileId).continuity();
-  }
-
   public ExtendedMetrics metrics(long userId, long fileId) {
     if (files.selectOwnedById(fileId, userId) == null) {
       return new ExtendedMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);

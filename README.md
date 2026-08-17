@@ -2,6 +2,8 @@
 
 Java 17 / Spring Boot 3.5 模块化单体后端，完成注册登录、用户数据隔离、CSV 流式解析、MinIO 原文件存储、MySQL 批量入库、同步与 RabbitMQ 异步分析、Redis Cache-Aside，以及不可变 HTML 分析报告。
 
+项目公开基线为已验收的 REST API 数据处理链路。Thymeleaf 网页与 Redis Session 兼容扩展仍在迭代，不作为已完成的发布承诺；其当前范围、验证记录和剩余事项见 `PLANS.md`。仓库仅包含人工构造的非敏感 CSV 样例，运行凭据必须保存在本地 `.env`，不得提交。
+
 ## 技术栈与架构
 
 Spring MVC、Security/JWT、Validation、MyBatis-Plus/MyBatis XML、Flyway、MySQL 8.4、MinIO、RabbitMQ、Redis、Springdoc、Testcontainers。控制器只处理 HTTP；应用服务编排用例和事务；规则与状态位于业务模块；基础设施适配器隔离数据库和中间件。
@@ -78,4 +80,33 @@ docker info
 
 ## 已知限制
 
-第一版不包含 PDF/Word/Excel 导出、AI 报告、完整前端、邮件/定时/审批、Transactional Outbox、微服务、Kubernetes、Kafka 或 Prometheus/Grafana 平台。HTML 报告是生成时快照，不作算法显著性、吞吐量或生产部署结论。
+公开基线不包含 PDF/Word/Excel 导出、AI 报告、邮件/定时/审批、微服务、Kubernetes、Kafka 或 Prometheus/Grafana 平台。HTML 报告是生成时快照，不作算法显著性、吞吐量或生产部署结论。网页兼容扩展与可靠投递相关的后续工作不属于该基线，不能据此作已完成承诺。
+
+## 浏览器兼容扩展（开发中）
+
+项目保留 `/api/**` 的无状态 JWT REST 接口，同时增加 Thymeleaf 网页入口。API 客户端继续通过 Bearer Token 调用；浏览器通过表单登录和 Spring Session Redis 使用 `/app/**`，管理员页面位于 `/admin/**`。两者共享 `sys_user`、BCrypt 密码、角色、应用服务、MySQL、RabbitMQ 和 MinIO，不复制业务模型。
+
+```mermaid
+flowchart LR
+  B[浏览器] --> S[Session + Thymeleaf]
+  S --> WC[Web Controller]
+  A[API 客户端] --> J[JWT + REST]
+  J --> RC[REST Controller]
+  WC --> AS[Application Service]
+  RC --> AS
+  AS --> I[MySQL / Redis / RabbitMQ / MinIO]
+```
+
+第一条 `SecurityFilterChain` 以最高优先级只匹配 `/api/**`，不读取 Session、关闭 CSRF，并返回 JSON 401/403。第二条链负责 `/login`、`/app/**` 和 `/admin/**`，启用 CSRF、Session Fixation 防护和表单退出。JWT Filter 的 Servlet 自动注册被显式禁用，保证它不会过滤网页请求。
+
+公众注册默认通过 `APP_PUBLIC_REGISTRATION_ENABLED=false` 关闭。首个管理员仅在数据库没有可用 ADMIN 时由 `APP_ADMIN_USERNAME` 和 `APP_ADMIN_PASSWORD` 初始化；初始化可重复执行且已有可用管理员时不会新增账号。密码至少 12 位且只保存 BCrypt 哈希，不记录到日志。网页会话默认 30 分钟，Redis namespace 为 `track-analysis:web-session`，并使用按稳定用户名建立 principal 索引的 indexed repository；这使应用可以精确查找同一用户的多个 Session，而不扫描 Redis 全库。用户名当前不可编辑，因此不会产生索引名称迁移问题。本地 HTTP 使用 `WEB_SESSION_COOKIE_SECURE=false`，HTTPS 部署必须设为 `true`。
+
+禁用、启用、管理员重置密码、用户自行修改密码或角色变更都会递增 `auth_version`，因此旧 JWT 永久失效；事务成功提交后会发布安全变更事件并删除目标用户的全部网页 Session，其他用户不受影响。清理放在 `AFTER_COMMIT` 是为了避免数据库事务回滚时错误踢出用户。若提交后的 Redis 清理失败，数据库安全变更保持成功，应用记录带堆栈的安全错误而不向用户虚报主操作失败；此时数据库状态与 `auth_version` 仍会阻止旧身份继续通过业务身份检查，但运维必须根据错误日志恢复 Redis 并重新执行失效操作。Session 删除本身是幂等的，并适用于共享同一 Redis 的多实例部署。
+
+当前网页入口包括 `/login`、`/app/dashboard`、`/app/profile`、`/app/datasets`、按文件查询的 `/app/tasks?fileId=...`、`/app/tasks/{id}`、`/app/results/{fileId}`、`/admin/users`、`/admin/users/{id}` 与 `/admin/audit-logs`。用户可验证旧密码后自行改密；管理员可创建、启停、重置密码、编辑基本资料并重分配角色。最后一个可用管理员的禁用或降权通过锁定 `ADMIN` 角色行串行化，并结合乐观锁检测同一用户的并发修改。
+
+真实 HTTP 烟测使用 `./scripts/smoke-web-auth.ps1`。脚本在现有 MySQL 中创建独立验收数据库，由 Flyway 和应用管理员引导逻辑初始化，通过网页表单创建研究员，在内存生成临时密码，验证双 Session、JWT、CSRF、权限、禁用/启用、重置密码、自助改密、角色变更、审计与 Redis principal 索引，最后恢复原 app 配置；不会输出密码、JWT、Cookie 或 Session ID，也不会删除数据库或 Volume。
+
+V12 在不修改 V1-V11 的前提下增加任务租约字段、数据集删除状态和 `reliable_outbox`。消费者通过唯一 `lease_token` 原子领取任务，由共享的受管理调度器续租；恢复只匹配已过期租约，完成/失败必须仍持有令牌。数据集删除先在 MySQL 事务内写入 `DELETE_PENDING`、关键审计及幂等清理事件，再由清理器删除 MinIO 对象并条件完成为 `DELETED`；失败进入可观察、退避重试流程。RabbitMQ 任务发布也由 Outbox 恢复。完整业务烟测入口为 `./scripts/smoke-web-business.ps1`，覆盖真实上传、解析、任务、结果、删除状态机与身份失效；最终验收前必须在本轮最终镜像上实际执行成功。
+
+测试证据必须分开报告：`clean verify` 是单元及 MockMvc 测试；`clean verify -Pit` 另外执行 MySQL 8.4 Testcontainers/Failsafe 持久化和 API 集成测试；indexed Redis 的真实行为由 Compose HTTP 烟测验证。网页兼容扩展尚未完成独立人工视觉验收和最终独立评审，不能标记为完成；详情见 `PLANS.md`。

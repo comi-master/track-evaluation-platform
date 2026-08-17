@@ -4,6 +4,7 @@ import com.example.trackanalysis.auth.security.AuthenticatedUser;
 import com.example.trackanalysis.common.api.Result;
 import com.example.trackanalysis.common.logging.RequestIdFilter;
 import com.example.trackanalysis.task.application.AnalysisTaskApplicationService;
+import com.example.trackanalysis.task.application.TaskAuditContext;
 import com.example.trackanalysis.task.domain.AnalysisTaskStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -33,7 +34,15 @@ public class AnalysisTaskController {
     return ResponseEntity.accepted()
         .body(
             Result.success(
-                service.create(user.id(), fileId, body.abnormalThreshold()),
+                service.create(
+                    user.id(),
+                    fileId,
+                    body.abnormalThreshold(),
+                    new TaskAuditContext(
+                        user.id(),
+                        user.username(),
+                        RequestIdFilter.requestId(request),
+                        request.getRemoteAddr())),
                 RequestIdFilter.requestId(request)));
   }
 
@@ -63,6 +72,16 @@ public class AnalysisTaskController {
       @PathVariable @Min(1) long taskId,
       HttpServletRequest request) {
     return ResponseEntity.accepted()
-        .body(Result.success(service.retry(user.id(), taskId), RequestIdFilter.requestId(request)));
+        .body(
+            Result.success(
+                service.retry(
+                    user.id(),
+                    taskId,
+                    new TaskAuditContext(
+                        user.id(),
+                        user.username(),
+                        RequestIdFilter.requestId(request),
+                        request.getRemoteAddr())),
+                RequestIdFilter.requestId(request)));
   }
 }

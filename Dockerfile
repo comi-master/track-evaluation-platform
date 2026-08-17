@@ -2,9 +2,9 @@ FROM eclipse-temurin:17-jdk-jammy AS build
 WORKDIR /workspace
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
-RUN chmod +x mvnw && ./mvnw -DskipTests dependency:go-offline
+RUN --mount=type=cache,target=/root/.m2 chmod +x mvnw && ./mvnw -DskipTests dependency:go-offline
 COPY src src
-RUN ./mvnw -DskipTests package
+RUN --mount=type=cache,target=/root/.m2 ./mvnw -DskipTests package
 
 FROM eclipse-temurin:17-jre-jammy
 RUN useradd --system --uid 10001 --create-home appuser

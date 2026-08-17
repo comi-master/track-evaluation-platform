@@ -4,6 +4,7 @@ import com.example.trackanalysis.auth.security.AuthenticatedUser;
 import com.example.trackanalysis.common.api.Result;
 import com.example.trackanalysis.common.logging.RequestIdFilter;
 import com.example.trackanalysis.dataset.application.DatasetApplicationService;
+import com.example.trackanalysis.storage.DatasetDeletionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,9 +33,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class DatasetController {
 
   private final DatasetApplicationService datasetService;
+  private final DatasetDeletionService deletionService;
 
-  public DatasetController(DatasetApplicationService datasetService) {
+  public DatasetController(
+      DatasetApplicationService datasetService, DatasetDeletionService deletionService) {
     this.datasetService = datasetService;
+    this.deletionService = deletionService;
   }
 
   @PostMapping
@@ -94,7 +98,13 @@ public class DatasetController {
       @AuthenticationPrincipal AuthenticatedUser principal,
       @PathVariable @Min(value = 1, message = "id must be positive") long id,
       HttpServletRequest servletRequest) {
-    datasetService.delete(principal.id(), id);
+    deletionService.request(
+        principal.id(),
+        id,
+        principal.id(),
+        principal.username(),
+        RequestIdFilter.requestId(servletRequest),
+        servletRequest.getRemoteAddr());
     return Result.success(null, RequestIdFilter.requestId(servletRequest));
   }
 }

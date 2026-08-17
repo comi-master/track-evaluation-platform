@@ -14,6 +14,10 @@ public class AnalysisTaskDO {
   private Long trackFileId;
   private Double abnormalThreshold;
   private AnalysisTaskStatus status;
+  private String leaseOwner;
+  private String leaseToken;
+  private LocalDateTime leaseExpiresAt;
+  private LocalDateTime heartbeatAt;
   private Integer attemptCount;
   private Integer maxAttempts;
   private Long analysisResultId;
@@ -54,6 +58,38 @@ public class AnalysisTaskDO {
 
   public void setStatus(AnalysisTaskStatus value) {
     status = value;
+  }
+
+  public String getLeaseOwner() {
+    return leaseOwner;
+  }
+
+  public void setLeaseOwner(String value) {
+    leaseOwner = value;
+  }
+
+  public String getLeaseToken() {
+    return leaseToken;
+  }
+
+  public void setLeaseToken(String value) {
+    leaseToken = value;
+  }
+
+  public LocalDateTime getLeaseExpiresAt() {
+    return leaseExpiresAt;
+  }
+
+  public void setLeaseExpiresAt(LocalDateTime value) {
+    leaseExpiresAt = value;
+  }
+
+  public LocalDateTime getHeartbeatAt() {
+    return heartbeatAt;
+  }
+
+  public void setHeartbeatAt(LocalDateTime value) {
+    heartbeatAt = value;
   }
 
   public Integer getAttemptCount() {

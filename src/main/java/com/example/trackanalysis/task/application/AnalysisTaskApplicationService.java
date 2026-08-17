@@ -1,15 +1,18 @@
 package com.example.trackanalysis.task.application;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.trackanalysis.audit.application.AuditApplicationService;
 import com.example.trackanalysis.common.exception.BusinessException;
 import com.example.trackanalysis.common.exception.ErrorCode;
 import com.example.trackanalysis.messaging.AnalysisTaskPublisher;
+import com.example.trackanalysis.outbox.ReliableOutboxMapper;
 import com.example.trackanalysis.task.api.*;
 import com.example.trackanalysis.task.domain.AnalysisTaskStatus;
 import com.example.trackanalysis.task.infrastructure.persistence.*;
 import com.example.trackanalysis.track.infrastructure.persistence.TrackFileMapper;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -21,6 +24,8 @@ public class AnalysisTaskApplicationService {
   private final AnalysisTaskProperties properties;
   private final TransactionTemplate tx;
   private final Clock clock;
+  private final ReliableOutboxMapper outbox;
+  private final AuditApplicationService audit;
 
   public AnalysisTaskApplicationService(
       AnalysisTaskMapper tasks,
@@ -28,16 +33,25 @@ public class AnalysisTaskApplicationService {
       AnalysisTaskPublisher publisher,
       AnalysisTaskProperties properties,
       TransactionTemplate tx,
-      Clock clock) {
+      Clock clock,
+      ReliableOutboxMapper outbox,
+      AuditApplicationService audit) {
     this.tasks = tasks;
     this.files = files;
     this.publisher = publisher;
     this.properties = properties;
     this.tx = tx;
     this.clock = clock;
+    this.outbox = outbox;
+    this.audit = audit;
   }
 
   public AnalysisTaskResponse create(long userId, long fileId, double threshold) {
+    return create(userId, fileId, threshold, TaskAuditContext.fallback(userId));
+  }
+
+  public AnalysisTaskResponse create(
+      long userId, long fileId, double threshold, TaskAuditContext auditContext) {
     if (!Double.isFinite(threshold) || threshold < 0)
       throw new BusinessException(
           ErrorCode.INVALID_ARGUMENT, "Threshold must be finite and non-negative");
@@ -58,13 +72,24 @@ public class AnalysisTaskApplicationService {
     tx.executeWithoutResult(
         s -> {
           if (tasks.insertOwnedPending(task, userId) != 1) throw notFound();
+          if (outbox.insert(
+                  "task-publish:" + task.getId() + ":0",
+                  "TASK_PUBLISH",
+                  "TASK",
+                  task.getId(),
+                  "{}",
+                  now)
+              != 1) throw new IllegalStateException("Task event was not created");
+          audit.record(
+              auditContext.actorId(),
+              auditContext.username(),
+              "TASK_CREATE",
+              "TASK",
+              String.valueOf(task.getId()),
+              auditContext.requestId(),
+              auditContext.ipAddress(),
+              null);
         });
-    try {
-      publisher.publish(task.getId());
-    } catch (BusinessException exception) {
-      tasks.markFailed(task.getId(), "Task publication failed", LocalDateTime.now(clock));
-      throw exception;
-    }
     return get(userId, task.getId());
   }
 
@@ -86,16 +111,88 @@ public class AnalysisTaskApplicationService {
         result.getRecords().stream().map(this::response).toList());
   }
 
+  public AnalysisTaskPageResponse historyVisible(
+      long actorId,
+      boolean administrator,
+      Long fileId,
+      Long ownerId,
+      int page,
+      int size,
+      AnalysisTaskStatus status) {
+    var result =
+        tasks.selectVisiblePage(
+            new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), 100)),
+            actorId,
+            administrator,
+            fileId,
+            administrator ? ownerId : null,
+            status);
+    return new AnalysisTaskPageResponse(
+        result.getCurrent(),
+        result.getSize(),
+        result.getTotal(),
+        result.getPages(),
+        result.getRecords().stream().map(this::response).toList());
+  }
+
   public AnalysisTaskResponse retry(long userId, long taskId) {
+    return retry(userId, taskId, TaskAuditContext.fallback(userId));
+  }
+
+  public AnalysisTaskResponse retry(long userId, long taskId, TaskAuditContext auditContext) {
     if (tasks.selectOwnedById(taskId, userId) == null) throw notFound();
-    if (tasks.resetFailedOwned(taskId, userId, LocalDateTime.now(clock)) != 1)
-      throw new BusinessException(ErrorCode.CONFLICT, "Only failed tasks can be retried");
-    try {
-      publisher.publish(taskId);
-    } catch (BusinessException exception) {
-      tasks.markFailed(taskId, "Task publication failed", LocalDateTime.now(clock));
-      throw exception;
-    }
+    LocalDateTime now = LocalDateTime.now(clock);
+    tx.executeWithoutResult(
+        s -> {
+          if (tasks.resetFailedOwned(taskId, userId, now) != 1)
+            throw new BusinessException(ErrorCode.CONFLICT, "Only failed tasks can be retried");
+          if (outbox.insert(
+                  "task-publish:" + taskId + ":" + UUID.randomUUID(),
+                  "TASK_PUBLISH",
+                  "TASK",
+                  taskId,
+                  "{}",
+                  now)
+              != 1) throw new IllegalStateException("Task event was not created");
+          audit.record(
+              auditContext.actorId(),
+              auditContext.username(),
+              "TASK_RETRY",
+              "TASK",
+              String.valueOf(taskId),
+              auditContext.requestId(),
+              auditContext.ipAddress(),
+              null);
+        });
+    return get(userId, taskId);
+  }
+
+  public AnalysisTaskResponse getVisible(long actorId, boolean administrator, long taskId) {
+    var task = tasks.selectVisibleById(taskId, actorId, administrator);
+    if (task == null) throw notFound();
+    return response(task);
+  }
+
+  public AnalysisTaskResponse cancel(long userId, long taskId) {
+    return cancel(userId, taskId, TaskAuditContext.fallback(userId));
+  }
+
+  public AnalysisTaskResponse cancel(long userId, long taskId, TaskAuditContext auditContext) {
+    if (tasks.selectOwnedById(taskId, userId) == null) throw notFound();
+    tx.executeWithoutResult(
+        s -> {
+          if (tasks.cancelPendingOwned(taskId, userId, LocalDateTime.now(clock)) != 1)
+            throw new BusinessException(ErrorCode.CONFLICT, "Only pending tasks can be cancelled");
+          audit.record(
+              auditContext.actorId(),
+              auditContext.username(),
+              "TASK_CANCEL",
+              "TASK",
+              String.valueOf(taskId),
+              auditContext.requestId(),
+              auditContext.ipAddress(),
+              null);
+        });
     return get(userId, taskId);
   }
 

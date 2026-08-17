@@ -14,6 +14,29 @@ import org.apache.ibatis.annotations.Update;
 
 public interface TrackFileMapper extends BaseMapper<TrackFileDO> {
 
+  @Select(
+      """
+      SELECT d.user_id FROM track_file tf JOIN dataset d ON d.id=tf.dataset_id AND d.deleted=0
+      WHERE tf.id=#{fileId} AND d.delete_status='ACTIVE'
+        AND (#{admin}=TRUE OR d.user_id=#{actorId}) LIMIT 1
+      """)
+  Long selectVisibleOwnerId(
+      @Param("fileId") long fileId, @Param("actorId") long actorId, @Param("admin") boolean admin);
+
+  @Select(
+      """
+      SELECT tf.* FROM track_file tf JOIN dataset d ON d.id=tf.dataset_id
+      WHERE tf.dataset_id=#{datasetId} AND d.deleted=0 ORDER BY tf.created_at DESC,tf.id DESC
+      """)
+  java.util.List<TrackFileDO> selectActiveDatasetFiles(@Param("datasetId") long datasetId);
+
+  @Select(
+      """
+      SELECT COUNT(*) FROM analysis_task t JOIN track_file tf ON tf.id=t.track_file_id
+      WHERE tf.dataset_id=#{datasetId} AND t.status IN ('PENDING','RUNNING')
+      """)
+  int countNonTerminalTasks(@Param("datasetId") long datasetId);
+
   @Insert(
       """
       INSERT INTO track_file
@@ -24,6 +47,7 @@ public interface TrackFileMapper extends BaseMapper<TrackFileDO> {
              #{file.parseError,jdbcType=VARCHAR}, #{file.version}, #{file.createdAt}, #{file.updatedAt}
       FROM dataset d
       WHERE d.id = #{file.datasetId} AND d.user_id = #{userId} AND d.deleted = 0
+        AND d.delete_status='ACTIVE'
       """)
   @Options(useGeneratedKeys = true, keyProperty = "file.id")
   int insertOwned(@Param("file") TrackFileDO file, @Param("userId") long userId);
@@ -35,7 +59,7 @@ public interface TrackFileMapper extends BaseMapper<TrackFileDO> {
              tf.created_at, tf.updated_at
       FROM track_file tf
       JOIN dataset d ON d.id = tf.dataset_id AND d.deleted = 0
-      WHERE tf.id = #{fileId} AND d.user_id = #{userId}
+      WHERE tf.id = #{fileId} AND d.user_id = #{userId} AND d.delete_status='ACTIVE'
       LIMIT 1
       """)
   TrackFileDO selectOwnedById(@Param("fileId") long fileId, @Param("userId") long userId);
@@ -68,6 +92,7 @@ public interface TrackFileMapper extends BaseMapper<TrackFileDO> {
       SET tf.parse_status = 'PARSING', tf.parse_error = NULL,
           tf.version = tf.version + 1, tf.updated_at = #{updatedAt}
       WHERE tf.id = #{fileId} AND d.user_id = #{userId}
+        AND d.delete_status='ACTIVE'
         AND tf.parse_status IN ('UPLOADED', 'FAILED')
       """)
   int claimForParsing(

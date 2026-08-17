@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>生成仿真数据 · 航迹仿真评测平台</title><link rel="stylesheet" th:href="@{/css/app.css}"></head>
+<body>
+<header class="site-header"><a class="brand" th:href="@{/app/simulator}"><span class="brand-mark">T</span><span>航迹仿真评测平台<small>Trajectory evaluation lab</small></span></a><nav><a class="active" th:href="@{/app/simulator}">生成数据</a><a th:href="@{/app/history}">历史结果</a><a th:href="@{/app/profile}">用户信息</a></nav></header>
+<main class="shell">
+  <section class="hero generator-hero"><div><span class="eyebrow">SCENARIO GENERATOR / 01</span><h1>生成一份可复现的<br><em>航迹仿真数据</em></h1><p>选择运动模型、空间维度与观测噪声，生成带真实轨迹、观测轨迹和固定随机种子的 CSV。下载后运行你的算法，再把结果上传回来比较。</p></div><div class="hero-orbit"><span></span><i></i><b></b></div></section>
+  <section class="work-grid">
+    <div class="card form-card"><div class="section-heading"><div><span class="eyebrow">SCENARIO CONFIG</span><h2>仿真参数</h2></div><span class="step-pill">可复现</span></div>
+      <form method="post" th:action="@{/app/simulator/generate}" class="form-grid">
+        <label>运动模型<span class="hint">目标的理想运动规律</span><select name="motionModel"><option value="CONSTANT_VELOCITY">近似匀速（CV）</option><option value="CONSTANT_ACCELERATION">近似匀加速（CA）</option><option value="CIRCULAR">协调转弯（CT）</option></select></label>
+        <label>空间维度<span class="hint">输出坐标轴数量</span><select name="dimensions"><option value="2">二维 · X / Y</option><option value="3">三维 · X / Y / Z</option></select></label>
+        <label>观测噪声 σ<span class="hint">高斯位置噪声标准差</span><input type="number" name="noise" value="0.8" min="0" max="100" step="0.1"></label>
+        <label>目标数量<span class="hint">当前格式按连续轨迹段生成</span><input type="number" name="targetCount" value="1" min="1" max="10"></label>
+        <label>每目标采样点<span class="hint">建议 500–5,000 点</span><input type="number" name="points" value="500" min="10" max="10000"></label>
+        <label>采样间隔 Δt<span class="hint">单位：秒</span><input type="number" name="timeStep" value="0.1" min="0.001" max="100" step="0.001"></label>
+        <label>随机种子<span class="hint">相同种子得到相同数据</span><input type="number" name="seed" value="20260817"></label>
+        <label>异常阈值<span class="hint">位置误差超过该值即标记</span><input type="number" name="abnormalThreshold" value="1.0" min="0" max="1000" step="0.1"></label>
+        <label class="wide">场景名称 / 说明<textarea name="description" rows="3" placeholder="例如：CT 三维目标，σ=0.8，测试滤波器转弯跟踪能力"></textarea></label>
+        <div class="wide form-actions"><button class="primary-action" type="submit">生成并保存 CSV <span>→</span></button><span class="form-note">生成后自动完成基线解析和指标计算</span></div>
+      </form>
+    </div>
+    <aside class="card side-card"><span class="eyebrow">WHAT YOU GET</span><h2>一份数据，三种用途</h2><div class="feature-list"><div><strong>01</strong><p><b>真实轨迹</b><br>作为评测基准保存，用于计算算法误差。</p></div><div><strong>02</strong><p><b>带噪观测</b><br>作为算法输入，模拟传感器位置观测。</p></div><div><strong>03</strong><p><b>固定协议</b><br>统一 CSV 列和随机种子，便于复现实验。</p></div></div></aside>
+  </section>
+  <section class="card protocol-card"><div class="section-heading"><div><span class="eyebrow">CSV PROTOCOL</span><h2>数据格式说明</h2></div><span class="badge">CSV · UTF-8</span></div><div class="code-block">time,true_x,true_y,true_z,track_x,track_y,track_z</div><div class="protocol-grid"><p><b>true_x / true_y / true_z</b><br>理想运动模型生成的参考位置，平台用它计算误差。</p><p><b>track_x / track_y / track_z</b><br>叠加高斯观测噪声后的轨迹，可作为算法输入。</p><p><b>time</b><br>从 0 开始、按 Δt 单调递增的时间戳，单位为秒。</p></div><p class="notice">说明：当前数据库格式还没有 target_id 字段，多目标数据会按连续轨迹段写入；严格的多目标匹配评测需要后续增加目标编号和轨迹关联模型。</p></section>
+  <section class="card intro-strip"><div class="intro-icon">01</div><div><b>从可复现实验开始</b><p>每个场景都会保存参数、随机种子和基准数据。你可以用同一组输入重复运行不同算法，让结果比较建立在一致的数据条件之上。</p></div><div class="intro-chip">统一输入 · 可重复 · 可追溯</div></section>
+</main>
+</body></html>

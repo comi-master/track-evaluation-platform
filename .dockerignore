@@ -6,3 +6,8 @@ target
 *.log
 demo-output
 performance-output
+.tools
+uploads
+data
+tmp
+coverage

@@ -58,6 +58,15 @@ public class MinioObjectStorageService implements ObjectStorageService {
   }
 
   @Override
+  public void delete(String objectName) {
+    try {
+      client.removeObject(RemoveObjectArgs.builder().bucket(bucket).object(objectName).build());
+    } catch (Exception exception) {
+      throw unavailable("Object storage deletion failed", exception);
+    }
+  }
+
+  @Override
   public void deleteBestEffort(String objectName) {
     try {
       client.removeObject(RemoveObjectArgs.builder().bucket(bucket).object(objectName).build());

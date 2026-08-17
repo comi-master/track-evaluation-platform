@@ -26,10 +26,24 @@ class FlywayMigrationIT extends MySqlIntegrationTestSupport {
             ORDER BY installed_rank
             """);
 
-    assertThat(history).hasSize(9);
+    assertThat(history).hasSize(14);
     assertThat(history)
         .extracting(row -> row.get("version"))
-        .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9");
+        .containsExactly(
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            "14");
     assertThat(history).allSatisfy(row -> assertThat(row.get("success")).isEqualTo(true));
     assertThat(history).allSatisfy(row -> assertThat(row.get("checksum")).isNotNull());
   }

@@ -94,13 +94,19 @@ public class RabbitTopologyConfig {
   SimpleRabbitListenerContainerFactory manualAckFactory(
       ConnectionFactory connectionFactory,
       Jackson2JsonMessageConverter converter,
-      @Value("${spring.rabbitmq.listener.simple.auto-startup:true}") boolean autoStartup) {
+      @Value("${spring.rabbitmq.listener.simple.auto-startup:true}") boolean autoStartup,
+      @Value("${spring.rabbitmq.listener.simple.concurrency:2}") int concurrency,
+      @Value("${spring.rabbitmq.listener.simple.max-concurrency:8}") int maxConcurrency,
+      @Value("${spring.rabbitmq.listener.simple.prefetch:1}") int prefetch) {
     var factory = new SimpleRabbitListenerContainerFactory();
     factory.setConnectionFactory(connectionFactory);
     factory.setMessageConverter(converter);
     factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
     factory.setDefaultRequeueRejected(false);
     factory.setAutoStartup(autoStartup);
+    factory.setConcurrentConsumers(Math.max(1, concurrency));
+    factory.setMaxConcurrentConsumers(Math.max(Math.max(1, concurrency), maxConcurrency));
+    factory.setPrefetchCount(Math.max(1, prefetch));
     return factory;
   }
 }

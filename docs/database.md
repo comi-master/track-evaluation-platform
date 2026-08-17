@@ -2,7 +2,7 @@
 
 ## Implemented scope
 
-Milestones 1-4 contain six business tables through immutable Flyway migrations:
+The schema is managed by twelve immutable Flyway migrations. V1-V11 retain their released checksums; V12 is the additive recovery migration:
 
 - `V1__create_sys_user.sql`
 - `V2__create_dataset.sql`
@@ -11,8 +11,13 @@ Milestones 1-4 contain six business tables through immutable Flyway migrations:
 - `V5__create_track_point.sql`
 - `V6__create_analysis_result.sql`
 - `V7__create_abnormal_interval.sql`
+- `V8__create_analysis_task.sql`
+- `V9__create_analysis_report.sql`
+- `V10__add_web_roles_and_audit.sql`
+- `V11__support_task_cancellation.sql`
+- `V12__add_recovery_state_and_outbox.sql`
 
-Flyway also owns `flyway_schema_history`. No role, task, report, audit, or outbox table exists.
+Flyway also owns `flyway_schema_history`. V12 adds renewable task-lease columns, dataset deletion lifecycle columns, and `reliable_outbox` for durable task publication and object cleanup.
 
 ```mermaid
 erDiagram
@@ -21,6 +26,10 @@ erDiagram
     TRACK_FILE ||--o{ TRACK_POINT : parses_to
     TRACK_FILE ||--o{ ANALYSIS_RESULT : analyzed_as
     ANALYSIS_RESULT ||--o{ ABNORMAL_INTERVAL : contains
+    TRACK_FILE ||--o{ ANALYSIS_TASK : schedules
+    ANALYSIS_RESULT ||--o| ANALYSIS_TASK : completes
+    SYS_USER ||--o{ AUDIT_LOG : acts
+    DATASET ||--o{ RELIABLE_OUTBOX : cleanup_events
 ```
 
 ## `track_file` and `track_point`

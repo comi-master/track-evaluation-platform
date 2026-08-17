@@ -36,6 +36,9 @@ spring:
         auto-startup: ${RABBITMQ_LISTENER_ENABLED:true}
         acknowledge-mode: manual
         default-requeue-rejected: false
+        concurrency: ${RABBITMQ_CONCURRENCY:2}
+        max-concurrency: ${RABBITMQ_MAX_CONCURRENCY:8}
+        prefetch: ${RABBITMQ_PREFETCH:1}
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
@@ -43,6 +46,11 @@ spring:
       password: ${REDIS_PASSWORD:}
       connect-timeout: 500ms
       timeout: 500ms
+  session:
+    timeout: ${WEB_SESSION_TIMEOUT:30m}
+    redis:
+      namespace: track-analysis:web-session
+      repository-type: indexed
 
 storage:
   minio:
@@ -52,11 +60,15 @@ storage:
     bucket: ${MINIO_BUCKET:track-files}
 
 track:
+  outbox:
+    batch-size: ${OUTBOX_BATCH_SIZE:100}
   analysis:
     batch-size: ${ANALYSIS_BATCH_SIZE:1000}
   task:
     max-attempts: ${ANALYSIS_TASK_MAX_ATTEMPTS:3}
     retry-delay-milliseconds: ${ANALYSIS_RETRY_DELAY_MILLISECONDS:5000}
+    lease-duration-milliseconds: ${ANALYSIS_TASK_LEASE_MILLISECONDS:30000}
+    heartbeat-interval-milliseconds: ${ANALYSIS_TASK_HEARTBEAT_MILLISECONDS:5000}
   cache:
     latest-ttl: ${ANALYSIS_LATEST_CACHE_TTL:PT10M}
     comparison-ttl: ${ANALYSIS_COMPARISON_CACHE_TTL:PT5M}
@@ -70,6 +82,12 @@ security:
     secret: ${JWT_SECRET}
     issuer: ${JWT_ISSUER:track-analysis-platform}
     access-ttl-minutes: ${JWT_ACCESS_TTL_MINUTES:120}
+
+app:
+  auth:
+    public-registration-enabled: ${APP_PUBLIC_REGISTRATION_ENABLED:true}
+    admin-username: ${APP_ADMIN_USERNAME:}
+    admin-password: ${APP_ADMIN_PASSWORD:}
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -85,6 +103,12 @@ mybatis-plus:
 
 server:
   shutdown: graceful
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${WEB_SESSION_COOKIE_SECURE:false}
   error:
     include-message: never
     include-binding-errors: never

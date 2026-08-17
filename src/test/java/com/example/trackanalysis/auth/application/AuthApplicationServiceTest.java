@@ -1,12 +1,14 @@
 package com.example.trackanalysis.auth.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.trackanalysis.auth.api.LoginRequest;
 import com.example.trackanalysis.auth.api.RegisterRequest;
+import com.example.trackanalysis.auth.config.WebAuthProperties;
 import com.example.trackanalysis.auth.security.AuthenticatedUser;
 import com.example.trackanalysis.auth.security.IssuedToken;
 import com.example.trackanalysis.auth.security.JwtService;
@@ -40,7 +42,8 @@ class AuthApplicationServiceTest {
             userMapper,
             new BCryptPasswordEncoder(),
             jwtService,
-            Clock.fixed(Instant.parse("2026-07-16T08:00:00Z"), ZoneOffset.UTC));
+            Clock.fixed(Instant.parse("2026-07-16T08:00:00Z"), ZoneOffset.UTC),
+            new WebAuthProperties(true, "", ""));
   }
 
   @Test
@@ -61,6 +64,22 @@ class AuthApplicationServiceTest {
     assertThat(user.getPasswordHash()).startsWith("$2").doesNotContain("plain-password");
     assertThat(new BCryptPasswordEncoder().matches("plain-password", user.getPasswordHash()))
         .isTrue();
+  }
+
+  @Test
+  void publicRegistrationCanBeDisabledWithoutRemovingCompatibilityCode() {
+    AuthApplicationService disabledService =
+        new AuthApplicationService(
+            userMapper,
+            new BCryptPasswordEncoder(),
+            jwtService,
+            Clock.fixed(Instant.parse("2026-07-16T08:00:00Z"), ZoneOffset.UTC),
+            new WebAuthProperties(false, "", ""));
+
+    assertThatThrownBy(
+            () -> disabledService.register(new RegisterRequest("researcher02", "plain-password")))
+        .isInstanceOf(BusinessException.class)
+        .hasMessage("Public registration is disabled");
   }
 
   @Test

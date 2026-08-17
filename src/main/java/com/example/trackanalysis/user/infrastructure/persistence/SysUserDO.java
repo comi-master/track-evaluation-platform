@@ -16,8 +16,12 @@ public class SysUserDO {
   private Long id;
 
   private String username;
+  private String displayName;
+  private String email;
   private String passwordHash;
   private String status;
+  private Integer failedLoginCount;
+  private LocalDateTime lastLoginAt;
   private Integer authVersion;
 
   @Version private Integer version;
@@ -44,6 +48,38 @@ public class SysUserDO {
 
   public void setUsername(String username) {
     this.username = username;
+  }
+
+  public String getDisplayName() {
+    return displayName;
+  }
+
+  public void setDisplayName(String displayName) {
+    this.displayName = displayName;
+  }
+
+  public String getEmail() {
+    return email;
+  }
+
+  public void setEmail(String email) {
+    this.email = email;
+  }
+
+  public Integer getFailedLoginCount() {
+    return failedLoginCount;
+  }
+
+  public void setFailedLoginCount(Integer failedLoginCount) {
+    this.failedLoginCount = failedLoginCount;
+  }
+
+  public LocalDateTime getLastLoginAt() {
+    return lastLoginAt;
+  }
+
+  public void setLastLoginAt(LocalDateTime lastLoginAt) {
+    this.lastLoginAt = lastLoginAt;
   }
 
   public String getPasswordHash() {

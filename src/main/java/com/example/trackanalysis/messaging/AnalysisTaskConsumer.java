@@ -12,6 +12,7 @@ import com.rabbitmq.client.Channel;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
@@ -30,6 +31,8 @@ public class AnalysisTaskConsumer {
   private final TrackFileMapper files;
   private final DatasetMapper datasets;
   private final AnalysisTaskProperties properties;
+  private final TaskLeaseHeartbeat heartbeat;
+  private final String workerId = UUID.randomUUID().toString();
 
   public AnalysisTaskConsumer(
       AnalysisTaskMapper tasks,
@@ -39,7 +42,8 @@ public class AnalysisTaskConsumer {
       Clock clock,
       TrackFileMapper files,
       DatasetMapper datasets,
-      AnalysisTaskProperties properties) {
+      AnalysisTaskProperties properties,
+      TaskLeaseHeartbeat heartbeat) {
     this.tasks = tasks;
     this.analysis = analysis;
     this.publisher = publisher;
@@ -48,6 +52,7 @@ public class AnalysisTaskConsumer {
     this.files = files;
     this.datasets = datasets;
     this.properties = properties;
+    this.heartbeat = heartbeat;
   }
 
   @RabbitListener(queues = RabbitTopologyConfig.QUEUE, containerFactory = "manualAckFactory")
@@ -72,27 +77,43 @@ public class AnalysisTaskConsumer {
       return;
     }
     if (task.getStatus() == AnalysisTaskStatus.SUCCESS
-        || task.getStatus() == AnalysisTaskStatus.RUNNING) {
+        || task.getStatus() == AnalysisTaskStatus.CANCELLED) {
       channel.basicAck(tag, false);
+      return;
+    }
+    if (task.getStatus() == AnalysisTaskStatus.RUNNING) {
+      recoverOrDelayRunning(task, tag, channel);
       return;
     }
     if (task.getStatus() == AnalysisTaskStatus.FAILED) {
       deadOrReject(command.taskId(), tag, channel);
       return;
     }
-    int claimed = tx.execute(s -> tasks.claim(command.taskId(), LocalDateTime.now(clock)));
+    LocalDateTime claimedAt = LocalDateTime.now(clock);
+    String leaseToken = UUID.randomUUID().toString();
+    int claimed =
+        tx.execute(
+            s ->
+                tasks.claim(
+                    command.taskId(),
+                    workerId,
+                    leaseToken,
+                    claimedAt,
+                    properties.leaseDurationMilliseconds()));
     if (claimed != 1) {
       channel.basicAck(tag, false);
       return;
     }
     task = tasks.selectById(command.taskId());
-    try {
+    try (TaskLeaseHeartbeat.Lease lease = heartbeat.start(task.getId(), leaseToken)) {
       AnalysisTaskDO running = task;
       analysis.createForTask(
           running.getTrackFileId(),
           running.getAbnormalThreshold(),
           resultId -> {
-            if (tasks.markSuccess(running.getId(), resultId, LocalDateTime.now(clock)) != 1)
+            LocalDateTime now = LocalDateTime.now(clock);
+            if (!lease.isOwned()
+                || tasks.markSuccess(running.getId(), resultId, leaseToken, now) != 1)
               throw new IllegalStateException("Task state changed during completion");
           });
       try {
@@ -109,11 +130,26 @@ public class AnalysisTaskConsumer {
       }
       channel.basicAck(tag, false);
     } catch (BusinessException permanent) {
-      tasks.markFailed(task.getId(), safePermanent(permanent), LocalDateTime.now(clock));
-      deadOrReject(task.getId(), tag, channel);
+      if (tasks.markFailedOwned(
+              task.getId(), leaseToken, safePermanent(permanent), LocalDateTime.now(clock))
+          == 1) deadOrReject(task.getId(), tag, channel);
+      else channel.basicAck(tag, false);
     } catch (RuntimeException temporary) {
       handleTemporary(task, tag, channel, temporary);
     }
+  }
+
+  private void recoverOrDelayRunning(AnalysisTaskDO task, long tag, Channel channel)
+      throws IOException {
+    LocalDateTime now = LocalDateTime.now(clock);
+    if (task.getAttemptCount() >= task.getMaxAttempts()) {
+      if (tasks.failExpiredExhausted(task.getId(), now) == 1)
+        deadOrReject(task.getId(), tag, channel);
+      else channel.basicAck(tag, false);
+      return;
+    }
+    if (tasks.recoverExpiredRunning(task.getId(), now) == 1) publisher.publishRetry(task.getId());
+    channel.basicAck(tag, false);
   }
 
   private void handleInfrastructure(
@@ -140,7 +176,8 @@ public class AnalysisTaskConsumer {
     String safe = "Temporary analysis failure";
     AnalysisTaskDO current = tasks.selectById(task.getId());
     if (current.getAttemptCount() < current.getMaxAttempts()
-        && tasks.scheduleRetry(task.getId(), safe, LocalDateTime.now(clock)) == 1) {
+        && tasks.scheduleRetry(task.getId(), task.getLeaseToken(), safe, LocalDateTime.now(clock))
+            == 1) {
       try {
         publisher.publishRetry(task.getId());
         channel.basicAck(tag, false);
@@ -149,8 +186,9 @@ public class AnalysisTaskConsumer {
         log.warn("Analysis retry publication failed for taskId={}", task.getId());
       }
     }
-    tasks.markFailed(task.getId(), safe, LocalDateTime.now(clock));
-    deadOrReject(task.getId(), tag, channel);
+    if (tasks.markFailedOwned(task.getId(), task.getLeaseToken(), safe, LocalDateTime.now(clock))
+        == 1) deadOrReject(task.getId(), tag, channel);
+    else channel.basicAck(tag, false);
     log.debug("Temporary analysis failure detail", failure);
   }
 

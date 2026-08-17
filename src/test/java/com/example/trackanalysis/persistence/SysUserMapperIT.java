@@ -48,6 +48,20 @@ class SysUserMapperIT extends MySqlIntegrationTestSupport {
   }
 
   @Test
+  void deletedDisabledUserCanBeExplicitlyRestored() {
+    SysUserDO user = newUser("restore-deleted-user");
+    user.setStatus("DISABLED");
+    userMapper.insert(user);
+    userMapper.deleteById(user.getId());
+
+    assertThat(userMapper.selectByUsername(user.getUsername())).isNull();
+    assertThat(userMapper.selectByUsernameIncludingDeleted(user.getUsername()).getDeleted())
+        .isOne();
+    assertThat(userMapper.restoreDeleted(user.getId(), java.time.LocalDateTime.now())).isOne();
+    assertThat(userMapper.selectByUsername(user.getUsername()).getStatus()).isEqualTo("DISABLED");
+  }
+
+  @Test
   void optimisticLockRejectsAStaleUpdateAndRefreshesUpdatedAt() {
     SysUserDO user = newUser("optimistic-user");
     userMapper.insert(user);
@@ -61,6 +75,21 @@ class SysUserMapperIT extends MySqlIntegrationTestSupport {
 
     stale.setStatus("DISABLED");
     assertThat(userMapper.updateById(stale)).isZero();
+  }
+
+  @Test
+  void exactUsernameLookupIncludesDisabledButActiveLookupDoesNot() {
+    SysUserDO active = newUser("lookup-active-user");
+    SysUserDO disabled = newUser("lookup-disabled-user");
+    disabled.setStatus("DISABLED");
+    userMapper.insert(active);
+    userMapper.insert(disabled);
+
+    assertThat(userMapper.selectByUsername(active.getUsername()).getStatus()).isEqualTo("ACTIVE");
+    assertThat(userMapper.selectByUsername(disabled.getUsername()).getStatus())
+        .isEqualTo("DISABLED");
+    assertThat(userMapper.selectActiveByUsername(disabled.getUsername())).isNull();
+    assertThat(userMapper.selectByUsername("lookup-missing-user")).isNull();
   }
 
   @Test

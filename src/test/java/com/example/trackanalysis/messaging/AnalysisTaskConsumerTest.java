@@ -15,6 +15,8 @@ import com.rabbitmq.client.Channel;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongConsumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,7 @@ class AnalysisTaskConsumerTest {
   @Mock TransactionTemplate tx;
   @Mock TrackFileMapper files;
   @Mock DatasetMapper datasets;
+  @Mock TaskLeaseHeartbeat heartbeat;
   @Mock Channel channel;
   AnalysisTaskConsumer consumer;
   Message raw;
@@ -49,7 +52,13 @@ class AnalysisTaskConsumerTest {
             Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
             files,
             datasets,
-            new com.example.trackanalysis.task.application.AnalysisTaskProperties(3, 5000));
+            new com.example.trackanalysis.task.application.AnalysisTaskProperties(
+                3, 5000, 30000, 5000),
+            heartbeat);
+    lenient()
+        .when(heartbeat.start(anyLong(), anyString()))
+        .thenReturn(
+            new TaskLeaseHeartbeat.Lease(new AtomicBoolean(true), mock(ScheduledFuture.class)));
     MessageProperties properties = new MessageProperties();
     properties.setDeliveryTag(77);
     raw = new Message(new byte[0], properties);
@@ -75,12 +84,15 @@ class AnalysisTaskConsumerTest {
   }
 
   @Test
-  void successAndRunningDuplicatesAckWithoutSecondAnalysis() throws Exception {
+  void successAcksButRunningDuplicateIsDelayedForCrashRecovery() throws Exception {
     when(tasks.selectById(1L)).thenReturn(task(AnalysisTaskStatus.SUCCESS, 1, 3));
     consumer.consume(new AnalysisTaskMessage(1, 1), raw, channel);
     reset(channel);
     when(tasks.selectById(1L)).thenReturn(task(AnalysisTaskStatus.RUNNING, 1, 3));
+    when(tasks.recoverExpiredRunning(eq(1L), any())).thenReturn(1);
     consumer.consume(new AnalysisTaskMessage(1, 1), raw, channel);
+    verify(publisher).publishRetry(1);
+    verify(tasks).recoverExpiredRunning(eq(1L), any());
     verify(channel).basicAck(77, false);
     verifyNoInteractions(analysis);
   }
@@ -90,8 +102,8 @@ class AnalysisTaskConsumerTest {
     AnalysisTaskDO pending = task(AnalysisTaskStatus.PENDING, 0, 3);
     AnalysisTaskDO running = task(AnalysisTaskStatus.RUNNING, 1, 3);
     when(tasks.selectById(1L)).thenReturn(pending, running, running);
-    when(tasks.claim(eq(1L), any())).thenReturn(1);
-    when(tasks.scheduleRetry(eq(1L), anyString(), any())).thenReturn(1);
+    when(tasks.claim(eq(1L), anyString(), anyString(), any(), anyLong())).thenReturn(1);
+    when(tasks.scheduleRetry(eq(1L), anyString(), anyString(), any())).thenReturn(1);
     doThrow(new IllegalStateException("database unavailable"))
         .when(analysis)
         .createForTask(eq(5L), eq(2d), any(LongConsumer.class));
@@ -106,23 +118,25 @@ class AnalysisTaskConsumerTest {
     AnalysisTaskDO pending = task(AnalysisTaskStatus.PENDING, 2, 3);
     AnalysisTaskDO running = task(AnalysisTaskStatus.RUNNING, 3, 3);
     when(tasks.selectById(1L)).thenReturn(pending, running, running);
-    when(tasks.claim(eq(1L), any())).thenReturn(1);
+    when(tasks.claim(eq(1L), anyString(), anyString(), any(), anyLong())).thenReturn(1);
+    when(tasks.markFailedOwned(eq(1L), anyString(), anyString(), any())).thenReturn(1);
     doThrow(new IllegalStateException("database unavailable"))
         .when(analysis)
         .createForTask(eq(5L), eq(2d), any(LongConsumer.class));
     consumer.consume(new AnalysisTaskMessage(1, 1), raw, channel);
-    verify(tasks).markFailed(eq(1L), eq("Temporary analysis failure"), any());
+    verify(tasks).markFailedOwned(eq(1L), any(), eq("Temporary analysis failure"), any());
     verify(publisher).publishDead(1);
     verify(channel).basicAck(77, false);
 
     reset(channel, publisher, analysis, tasks);
     when(tasks.selectById(1L)).thenReturn(pending, running);
-    when(tasks.claim(eq(1L), any())).thenReturn(1);
+    when(tasks.claim(eq(1L), anyString(), anyString(), any(), anyLong())).thenReturn(1);
+    when(tasks.markFailedOwned(eq(1L), anyString(), anyString(), any())).thenReturn(1);
     doThrow(new BusinessException(ErrorCode.CONFLICT, "sensitive point detail"))
         .when(analysis)
         .createForTask(eq(5L), eq(2d), any(LongConsumer.class));
     consumer.consume(new AnalysisTaskMessage(1, 1), raw, channel);
-    verify(tasks).markFailed(eq(1L), eq("Analysis failed: CONFLICT"), any());
+    verify(tasks).markFailedOwned(eq(1L), any(), eq("Analysis failed: CONFLICT"), any());
     verify(publisher).publishDead(1);
   }
 
@@ -131,7 +145,7 @@ class AnalysisTaskConsumerTest {
     AnalysisTaskDO pending = task(AnalysisTaskStatus.PENDING, 0, 3);
     AnalysisTaskDO running = task(AnalysisTaskStatus.RUNNING, 1, 3);
     when(tasks.selectById(1L)).thenReturn(pending, running);
-    when(tasks.claim(eq(1L), any())).thenReturn(1);
+    when(tasks.claim(eq(1L), anyString(), anyString(), any(), anyLong())).thenReturn(1);
     doThrow(new IllegalStateException("metadata unavailable")).when(files).selectById(5L);
     consumer.consume(new AnalysisTaskMessage(1, 1), raw, channel);
     verify(channel).basicAck(77, false);
@@ -147,6 +161,7 @@ class AnalysisTaskConsumerTest {
     task.setStatus(status);
     task.setAttemptCount(attempts);
     task.setMaxAttempts(max);
+    if (status == AnalysisTaskStatus.RUNNING) task.setLeaseToken("lease-token");
     return task;
   }
 }

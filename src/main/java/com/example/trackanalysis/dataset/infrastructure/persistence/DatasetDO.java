@@ -22,6 +22,11 @@ public class DatasetDO {
   @Version private Integer version;
 
   @TableLogic private Integer deleted;
+  private String deleteStatus;
+  private LocalDateTime deleteRequestedAt;
+  private LocalDateTime deletedAt;
+  private String deleteError;
+  private Integer deleteAttemptCount;
 
   @TableField(fill = FieldFill.INSERT)
   private LocalDateTime createdAt;
@@ -75,6 +80,46 @@ public class DatasetDO {
 
   public void setDeleted(Integer deleted) {
     this.deleted = deleted;
+  }
+
+  public String getDeleteStatus() {
+    return deleteStatus;
+  }
+
+  public void setDeleteStatus(String value) {
+    deleteStatus = value;
+  }
+
+  public LocalDateTime getDeleteRequestedAt() {
+    return deleteRequestedAt;
+  }
+
+  public void setDeleteRequestedAt(LocalDateTime value) {
+    deleteRequestedAt = value;
+  }
+
+  public LocalDateTime getDeletedAt() {
+    return deletedAt;
+  }
+
+  public void setDeletedAt(LocalDateTime value) {
+    deletedAt = value;
+  }
+
+  public String getDeleteError() {
+    return deleteError;
+  }
+
+  public void setDeleteError(String value) {
+    deleteError = value;
+  }
+
+  public Integer getDeleteAttemptCount() {
+    return deleteAttemptCount;
+  }
+
+  public void setDeleteAttemptCount(Integer value) {
+    deleteAttemptCount = value;
   }
 
   public LocalDateTime getCreatedAt() {

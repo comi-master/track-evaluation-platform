@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.util.List;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -71,7 +72,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     SecurityContextHolder.getContext()
         .setAuthentication(
-            UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of()));
+            UsernamePasswordAuthenticationToken.authenticated(
+                principal,
+                null,
+                userMapper.selectRoleCodes(principal.id()).stream()
+                    .map(code -> new SimpleGrantedAuthority("ROLE_" + code))
+                    .toList()));
     try {
       filterChain.doFilter(request, response);
     } finally {

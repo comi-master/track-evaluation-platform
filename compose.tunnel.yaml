@@ -1,0 +1,12 @@
+services:
+  app:
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required}
+    restart: unless-stopped
+    depends_on:
+      app: {condition: service_healthy}
+    networks: [track-analysis-network]

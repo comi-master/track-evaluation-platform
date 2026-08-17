@@ -94,6 +94,12 @@ public class AnalysisApplicationService {
     return response;
   }
 
+  public AnalysisResponse get(long user, long resultId) {
+    AnalysisResultDO result = results.selectOwnedById(resultId, user);
+    if (result == null) throw notFound("Analysis result");
+    return response(result, intervals.selectOwnedByResult(resultId, user));
+  }
+
   public AnalysisPageResponse history(long user, long file, int page, int size) {
     owned(user, file);
     var p = results.selectOwnedPage(new Page<>(page, size), file, user);

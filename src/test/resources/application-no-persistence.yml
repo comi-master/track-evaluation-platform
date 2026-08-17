@@ -1,4 +1,8 @@
 spring:
+  session:
+    store-type: none
+    redis:
+      repository-type: default
   rabbitmq:
     listener:
       simple:
@@ -22,3 +26,6 @@ security:
     secret: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
     issuer: track-analysis-test
     access-ttl-minutes: 120
+app:
+  auth:
+    public-registration-enabled: true

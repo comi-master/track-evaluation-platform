@@ -9,12 +9,44 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 public interface DatasetMapper extends BaseMapper<DatasetDO> {
+  @Update(
+      """
+      UPDATE dataset SET delete_status='DELETE_PENDING',delete_requested_at=#{now},
+      delete_error=NULL,version=version+1,updated_at=#{now}
+      WHERE id=#{id} AND user_id=#{userId} AND deleted=0
+        AND delete_status IN ('ACTIVE','DELETE_FAILED')
+      """)
+  int requestDelete(
+      @Param("id") long id, @Param("userId") long userId, @Param("now") LocalDateTime now);
+
+  @Update(
+      """
+      UPDATE dataset SET deleted=1,delete_status='DELETED',deleted_at=#{now},delete_error=NULL,
+      version=version+1,updated_at=#{now} WHERE id=#{id} AND delete_status='DELETE_PENDING'
+      """)
+  int completeDelete(@Param("id") long id, @Param("now") LocalDateTime now);
+
+  @Update(
+      """
+      UPDATE dataset SET delete_status='DELETE_FAILED',delete_error=#{error},
+      delete_attempt_count=delete_attempt_count+1,version=version+1,updated_at=#{now}
+      WHERE id=#{id} AND delete_status='DELETE_PENDING'
+      """)
+  int failDelete(
+      @Param("id") long id, @Param("error") String error, @Param("now") LocalDateTime now);
+
+  @Update(
+      """
+      UPDATE dataset SET delete_status='DELETE_PENDING',delete_error=NULL,updated_at=#{now}
+      WHERE id=#{id} AND delete_status='DELETE_FAILED'
+      """)
+  int resumeDelete(@Param("id") long id, @Param("now") LocalDateTime now);
 
   @Select(
       """
       SELECT id, user_id, name, description, version, deleted, created_at, updated_at
       FROM dataset
-      WHERE id = #{id} AND user_id = #{userId} AND deleted = 0
+      WHERE id = #{id} AND user_id = #{userId} AND deleted = 0 AND delete_status='ACTIVE'
       LIMIT 1
       """)
   DatasetDO selectOwnedById(@Param("id") long id, @Param("userId") long userId);
@@ -24,7 +56,7 @@ public interface DatasetMapper extends BaseMapper<DatasetDO> {
       <script>
       SELECT id, user_id, name, description, version, deleted, created_at, updated_at
       FROM dataset
-      WHERE user_id = #{userId} AND deleted = 0
+      WHERE user_id = #{userId} AND deleted = 0 AND delete_status='ACTIVE'
       <if test="keyword != null">
         AND name LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!'
       </if>
@@ -45,6 +77,7 @@ public interface DatasetMapper extends BaseMapper<DatasetDO> {
         AND user_id = #{userId}
         AND version = #{version}
         AND deleted = 0
+        AND delete_status = 'ACTIVE'
       """)
   int updateOwned(
       @Param("id") long id,
@@ -60,7 +93,7 @@ public interface DatasetMapper extends BaseMapper<DatasetDO> {
       SET deleted = 1,
           version = version + 1,
           updated_at = #{updatedAt}
-      WHERE id = #{id} AND user_id = #{userId} AND deleted = 0
+      WHERE id = #{id} AND user_id = #{userId} AND deleted = 0 AND delete_status='ACTIVE'
       """)
   int deleteOwned(
       @Param("id") long id,
@@ -71,7 +104,10 @@ public interface DatasetMapper extends BaseMapper<DatasetDO> {
       """
       SELECT COUNT(*)
       FROM dataset
-      WHERE id = #{id} AND user_id = #{userId} AND deleted = 0
+      WHERE id = #{id} AND user_id = #{userId} AND deleted = 0 AND delete_status = 'ACTIVE'
       """)
   int countOwnedActive(@Param("id") long id, @Param("userId") long userId);
+
+  @Select("SELECT delete_status FROM dataset WHERE id=#{id} LIMIT 1")
+  String selectDeleteStatus(@Param("id") long id);
 }

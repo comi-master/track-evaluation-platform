@@ -5,6 +5,10 @@ security:
     access-ttl-minutes: 120
 
 spring:
+  session:
+    store-type: none
+    redis:
+      repository-type: default
   rabbitmq:
     listener:
       simple:
@@ -20,3 +24,7 @@ storage:
     access-key: test-access
     secret-key: test-secret
     bucket: track-files-test
+
+app:
+  auth:
+    public-registration-enabled: true

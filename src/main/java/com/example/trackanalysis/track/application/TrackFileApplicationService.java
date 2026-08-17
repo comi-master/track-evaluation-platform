@@ -170,6 +170,34 @@ public class TrackFileApplicationService {
     return toResponse(file);
   }
 
+  public long visibleOwnerId(long actorId, boolean administrator, long fileId) {
+    Long owner = fileMapper.selectVisibleOwnerId(fileId, actorId, administrator);
+    if (owner == null) throw fileNotFound();
+    return owner;
+  }
+
+  public TrackFileDownload download(long userId, long fileId) {
+    TrackFileDO file = fileMapper.selectOwnedById(fileId, userId);
+    if (file == null) throw fileNotFound();
+    return new TrackFileDownload(
+        file.getOriginalName(), file.getFileSize(), storage.get(file.getObjectName()));
+  }
+
+  public void deleteDatasetFiles(long datasetId) {
+    if (fileMapper.countNonTerminalTasks(datasetId) > 0) {
+      throw new BusinessException(ErrorCode.CONFLICT, "Dataset has a pending or running task");
+    }
+    var datasetFiles = fileMapper.selectActiveDatasetFiles(datasetId);
+    if (datasetFiles.size() > 1) {
+      throw new BusinessException(
+          ErrorCode.CONFLICT,
+          "Datasets with multiple stored files require the managed cleanup workflow");
+    }
+    for (TrackFileDO file : datasetFiles) {
+      storage.delete(file.getObjectName());
+    }
+  }
+
   public TrackFilePageResponse list(
       long userId, long datasetId, int page, int size, TrackSource source, ParseStatus status) {
     requireOwnedDataset(userId, datasetId);

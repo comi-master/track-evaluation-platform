@@ -9,5 +9,7 @@ public interface ObjectStorageService {
 
   InputStream get(String objectName);
 
+  void delete(String objectName);
+
   void deleteBestEffort(String objectName);
 }

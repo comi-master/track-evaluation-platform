@@ -18,7 +18,12 @@ import org.springframework.context.annotation.Profile;
   "com.example.trackanalysis.track.infrastructure.persistence",
   "com.example.trackanalysis.analysis.infrastructure.persistence",
   "com.example.trackanalysis.task.infrastructure.persistence",
-  "com.example.trackanalysis.report.infrastructure.persistence"
+  "com.example.trackanalysis.report.infrastructure.persistence",
+  "com.example.trackanalysis.audit.infrastructure.persistence",
+  "com.example.trackanalysis.benchmark.infrastructure.persistence",
+  "com.example.trackanalysis.evaluation.infrastructure.persistence",
+  "com.example.trackanalysis.outbox",
+  "com.example.trackanalysis.web.infrastructure"
 })
 public class PersistenceConfig {
 

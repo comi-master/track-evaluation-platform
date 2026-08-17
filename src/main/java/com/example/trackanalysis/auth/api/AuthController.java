@@ -1,8 +1,10 @@
 package com.example.trackanalysis.auth.api;
 
+import com.example.trackanalysis.audit.application.SafeAuditService;
 import com.example.trackanalysis.auth.application.AuthApplicationService;
 import com.example.trackanalysis.auth.security.AuthenticatedUser;
 import com.example.trackanalysis.common.api.Result;
+import com.example.trackanalysis.common.exception.BusinessException;
 import com.example.trackanalysis.common.logging.RequestIdFilter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -22,9 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
   private final AuthApplicationService authService;
+  private final SafeAuditService audit;
 
-  public AuthController(AuthApplicationService authService) {
+  public AuthController(AuthApplicationService authService, SafeAuditService audit) {
     this.authService = authService;
+    this.audit = audit;
   }
 
   @PostMapping("/register")
@@ -40,7 +44,34 @@ public class AuthController {
   @Operation(summary = "Log in and issue an access token")
   public Result<LoginResponse> login(
       @Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
-    return Result.success(authService.login(request), RequestIdFilter.requestId(servletRequest));
+    String requestId = RequestIdFilter.requestId(servletRequest);
+    try {
+      LoginResponse response = authService.login(request);
+      audit.record(
+          response.user().id(),
+          response.user().username(),
+          "REST_LOGIN_SUCCESS",
+          "AUTH",
+          null,
+          requestId,
+          servletRequest.getRemoteAddr(),
+          null);
+      return Result.success(response, requestId);
+    } catch (BusinessException exception) {
+      String username = request.username() == null ? "anonymous" : request.username().trim();
+      if (username.isBlank()) username = "anonymous";
+      if (username.length() > 64) username = username.substring(0, 64);
+      audit.record(
+          null,
+          username,
+          "REST_LOGIN_FAILURE",
+          "AUTH",
+          null,
+          requestId,
+          servletRequest.getRemoteAddr(),
+          null);
+      throw exception;
+    }
   }
 
   @GetMapping("/me")

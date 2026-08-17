@@ -4,6 +4,7 @@ import com.example.trackanalysis.auth.api.LoginRequest;
 import com.example.trackanalysis.auth.api.LoginResponse;
 import com.example.trackanalysis.auth.api.RegisterRequest;
 import com.example.trackanalysis.auth.api.UserResponse;
+import com.example.trackanalysis.auth.config.WebAuthProperties;
 import com.example.trackanalysis.auth.security.AuthenticatedUser;
 import com.example.trackanalysis.auth.security.IssuedToken;
 import com.example.trackanalysis.auth.security.JwtService;
@@ -30,21 +31,27 @@ public class AuthApplicationService {
   private final JwtService jwtService;
   private final Clock clock;
   private final String dummyPasswordHash;
+  private final WebAuthProperties webAuthProperties;
 
   public AuthApplicationService(
       SysUserMapper userMapper,
       PasswordEncoder passwordEncoder,
       JwtService jwtService,
-      Clock clock) {
+      Clock clock,
+      WebAuthProperties webAuthProperties) {
     this.userMapper = userMapper;
     this.passwordEncoder = passwordEncoder;
     this.jwtService = jwtService;
     this.clock = clock;
+    this.webAuthProperties = webAuthProperties;
     this.dummyPasswordHash = passwordEncoder.encode("constant-time-login-placeholder");
   }
 
   @Transactional
   public UserResponse register(RegisterRequest request) {
+    if (!webAuthProperties.publicRegistrationEnabled()) {
+      throw new BusinessException(ErrorCode.FORBIDDEN, "Public registration is disabled");
+    }
     String username = UsernamePolicy.normalize(request.username());
     if (userMapper.selectActiveByUsername(username) != null) {
       throw duplicateUsername();
@@ -56,6 +63,7 @@ public class AuthApplicationService {
     user.setStatus(UserStatus.ACTIVE.name());
     try {
       userMapper.insert(user);
+      userMapper.assignRole(user.getId(), "RESEARCHER");
     } catch (DataIntegrityViolationException exception) {
       throw new BusinessException(ErrorCode.CONFLICT, "Username is already registered", exception);
     }

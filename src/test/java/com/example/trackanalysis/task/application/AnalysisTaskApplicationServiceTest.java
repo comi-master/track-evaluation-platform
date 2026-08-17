@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.example.trackanalysis.audit.application.AuditApplicationService;
 import com.example.trackanalysis.common.exception.BusinessException;
 import com.example.trackanalysis.messaging.AnalysisTaskPublisher;
+import com.example.trackanalysis.outbox.ReliableOutboxMapper;
 import com.example.trackanalysis.task.domain.AnalysisTaskStatus;
 import com.example.trackanalysis.task.infrastructure.persistence.AnalysisTaskDO;
 import com.example.trackanalysis.task.infrastructure.persistence.AnalysisTaskMapper;
@@ -28,6 +30,8 @@ class AnalysisTaskApplicationServiceTest {
   @Mock TrackFileMapper files;
   @Mock AnalysisTaskPublisher publisher;
   @Mock TransactionTemplate tx;
+  @Mock ReliableOutboxMapper outbox;
+  @Mock AuditApplicationService audit;
   AnalysisTaskApplicationService service;
 
   @BeforeEach
@@ -37,9 +41,14 @@ class AnalysisTaskApplicationServiceTest {
             tasks,
             files,
             publisher,
-            new AnalysisTaskProperties(3, 5000),
+            new AnalysisTaskProperties(3, 5000, 30000, 5000),
             tx,
-            Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
+            Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
+            outbox,
+            audit);
+    lenient()
+        .when(outbox.insert(anyString(), anyString(), anyString(), anyLong(), anyString(), any()))
+        .thenReturn(1);
     lenient()
         .doAnswer(
             i -> {
@@ -63,7 +72,7 @@ class AnalysisTaskApplicationServiceTest {
   }
 
   @Test
-  void createsPendingTaskThenPublishes() {
+  void createsPendingTaskAndDurablePublicationEvent() {
     TrackFileDO file = new TrackFileDO();
     file.setParseStatus(ParseStatus.PARSED);
     when(files.selectOwnedById(2, 1)).thenReturn(file);
@@ -76,11 +85,12 @@ class AnalysisTaskApplicationServiceTest {
     AnalysisTaskDO saved = task(AnalysisTaskStatus.PENDING);
     when(tasks.selectOwnedById(9, 1)).thenReturn(saved);
     service.create(1, 2, 4);
-    verify(publisher).publish(9);
+    verify(outbox)
+        .insert(eq("task-publish:9:0"), eq("TASK_PUBLISH"), eq("TASK"), eq(9L), eq("{}"), any());
   }
 
   @Test
-  void publicationFailureMarksTaskFailed() {
+  void outboxFailureRollsBackTaskCreation() {
     TrackFileDO file = new TrackFileDO();
     file.setParseStatus(ParseStatus.PARSED);
     when(files.selectOwnedById(2, 1)).thenReturn(file);
@@ -90,13 +100,9 @@ class AnalysisTaskApplicationServiceTest {
               ((AnalysisTaskDO) i.getArgument(0)).setId(9L);
               return 1;
             });
-    doThrow(
-            new BusinessException(
-                com.example.trackanalysis.common.exception.ErrorCode.INFRASTRUCTURE_ERROR, "safe"))
-        .when(publisher)
-        .publish(9);
-    assertThatThrownBy(() -> service.create(1, 2, 4)).isInstanceOf(BusinessException.class);
-    verify(tasks).markFailed(eq(9L), eq("Task publication failed"), any());
+    when(outbox.insert(anyString(), anyString(), anyString(), anyLong(), anyString(), any()))
+        .thenReturn(0);
+    assertThatThrownBy(() -> service.create(1, 2, 4)).isInstanceOf(IllegalStateException.class);
   }
 
   @Test
@@ -106,7 +112,9 @@ class AnalysisTaskApplicationServiceTest {
     when(tasks.resetFailedOwned(eq(8L), eq(1L), any())).thenReturn(1);
     when(tasks.selectOwnedById(8, 1)).thenReturn(task(AnalysisTaskStatus.PENDING));
     service.retry(1, 8);
-    verify(publisher).publish(8);
+    verify(outbox)
+        .insert(
+            startsWith("task-publish:8:"), eq("TASK_PUBLISH"), eq("TASK"), eq(8L), eq("{}"), any());
   }
 
   private AnalysisTaskDO task(AnalysisTaskStatus status) {

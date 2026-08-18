@@ -93,6 +93,22 @@ docker compose --env-file .env -f docker-compose.yml -f compose.app.yaml ps
 
 截图应来自可复现的本地演示，并在提交前确认不包含用户名、密码、Token、内网地址、真实数据或个人信息。截图目录和命名规范见 [`docs/screenshots/README.md`](docs/screenshots/README.md)。当前仓库不伪造未实际采集的截图；补充截图后可在此处加入图片链接。
 
+### 登录页
+
+![平台登录页](docs/screenshots/login.png)
+
+### 仿真数据生成
+
+![仿真数据生成页面](docs/screenshots/scenario-generator.png)
+
+### 历史结果
+
+![历史结果页面](docs/screenshots/result-history.png)
+
+### 实验详情与结果比较
+
+![实验详情与结果比较页面](docs/screenshots/experiment-detail.png)
+
 ## 后续规划
 
 当前公开基线以 `PLANS.md` 的真实验收记录为准。后续优先完善浏览器端业务流程的独立视觉验收、更多 Redis 集成覆盖、业务审计覆盖和并发恢复测试；不把 Transactional Outbox、微服务拆分、Kubernetes、Kafka 或 AI 报告列为当前完成条件。

@@ -1,6 +1,7 @@
 .env
 LOCAL_ACCESS.md
 .idea/
+.vs/
 .vscode/
 *.iml
 *.log
@@ -12,3 +13,4 @@ performance-output/
 .tools/
 tmp/
 dependency-reduced-pom.xml
+地址用户名.txt

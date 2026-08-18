@@ -28,7 +28,8 @@ public class AlgorithmSubmissionController {
       @AuthenticationPrincipal AuthenticatedUser principal,
       @Valid @RequestBody CreateAlgorithmSubmissionRequest request,
       HttpServletRequest servletRequest) {
-    return Result.success(service.create(principal.id(), request), RequestIdFilter.requestId(servletRequest));
+    return Result.success(
+        service.create(principal.id(), request), RequestIdFilter.requestId(servletRequest));
   }
 
   @GetMapping("/{id}")
@@ -36,6 +37,7 @@ public class AlgorithmSubmissionController {
       @AuthenticationPrincipal AuthenticatedUser principal,
       @PathVariable @Min(1) long id,
       HttpServletRequest servletRequest) {
-    return Result.success(service.get(principal.id(), id), RequestIdFilter.requestId(servletRequest));
+    return Result.success(
+        service.get(principal.id(), id), RequestIdFilter.requestId(servletRequest));
   }
 }

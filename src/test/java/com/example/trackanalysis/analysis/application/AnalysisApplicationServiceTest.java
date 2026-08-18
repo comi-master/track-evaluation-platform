@@ -13,6 +13,7 @@ import com.example.trackanalysis.analysis.infrastructure.persistence.AnalysisRes
 import com.example.trackanalysis.analysis.infrastructure.persistence.AnalysisResultMapper;
 import com.example.trackanalysis.common.exception.BusinessException;
 import com.example.trackanalysis.common.exception.ErrorCode;
+import com.example.trackanalysis.common.metrics.AnalysisPerformanceMetrics;
 import com.example.trackanalysis.dataset.infrastructure.persistence.DatasetMapper;
 import com.example.trackanalysis.track.domain.ParseStatus;
 import com.example.trackanalysis.track.infrastructure.persistence.TrackFileDO;
@@ -45,6 +46,7 @@ class AnalysisApplicationServiceTest {
   @Mock TransactionTemplate transactions;
   @Mock DatasetMapper datasets;
   @Mock AnalysisCacheService cache;
+  @Mock AnalysisPerformanceMetrics performance;
   AnalysisApplicationService service;
 
   @BeforeEach
@@ -59,7 +61,8 @@ class AnalysisApplicationServiceTest {
             Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
             new AnalysisProperties(2),
             datasets,
-            cache);
+            cache,
+            performance);
     when(cache.latest(anyLong(), anyLong())).thenReturn(Optional.empty());
     doAnswer(
             invocation ->

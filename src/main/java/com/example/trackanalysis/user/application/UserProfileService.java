@@ -34,12 +34,15 @@ public class UserProfileService {
   }
 
   @Transactional
-  public void updateProfile(long userId, String displayName, String email, String requestId, String ip) {
+  public void updateProfile(
+      long userId, String displayName, String email, String requestId, String ip) {
     if (displayName != null && displayName.length() > 100) {
-      throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "Display name must be at most 100 characters");
+      throw new BusinessException(
+          ErrorCode.INVALID_ARGUMENT, "Display name must be at most 100 characters");
     }
     if (email != null && email.length() > 254) {
-      throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "Email must be at most 254 characters");
+      throw new BusinessException(
+          ErrorCode.INVALID_ARGUMENT, "Email must be at most 254 characters");
     }
     SysUserDO user = mapper.selectActiveByIdForUpdate(userId);
     if (user == null || !"ACTIVE".equals(user.getStatus())) {
@@ -51,7 +54,15 @@ public class UserProfileService {
     if (mapper.updateById(user) != 1) {
       throw new BusinessException(ErrorCode.CONFLICT, "User was changed by another request");
     }
-    audit.record(user.getId(), user.getUsername(), "PROFILE_UPDATE", "USER", String.valueOf(user.getId()), requestId, ip, null);
+    audit.record(
+        user.getId(),
+        user.getUsername(),
+        "PROFILE_UPDATE",
+        "USER",
+        String.valueOf(user.getId()),
+        requestId,
+        ip,
+        null);
   }
 
   private String blankToNull(String value) {

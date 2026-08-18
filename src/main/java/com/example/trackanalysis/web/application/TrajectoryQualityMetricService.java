@@ -50,16 +50,37 @@ public class TrajectoryQualityMetricService {
         count++;
         if (last != null) {
           transitions++;
-          double trueStep = distance(last.getTrueX(), last.getTrueY(), last.getTrueZ(), current.getTrueX(), current.getTrueY(), current.getTrueZ());
-          double trackStep = distance(last.getTrackX(), last.getTrackY(), last.getTrackZ(), current.getTrackX(), current.getTrackY(), current.getTrackZ());
-          if ((trueStep < 1e-9 && trackStep < 1e-9) || (trueStep >= 1e-9 && trackStep <= trueStep * 3.0)) stable++;
+          double trueStep =
+              distance(
+                  last.getTrueX(),
+                  last.getTrueY(),
+                  last.getTrueZ(),
+                  current.getTrueX(),
+                  current.getTrueY(),
+                  current.getTrueZ());
+          double trackStep =
+              distance(
+                  last.getTrackX(),
+                  last.getTrackY(),
+                  last.getTrackZ(),
+                  current.getTrackX(),
+                  current.getTrackY(),
+                  current.getTrackZ());
+          if ((trueStep < 1e-9 && trackStep < 1e-9)
+              || (trueStep >= 1e-9 && trackStep <= trueStep * 3.0)) stable++;
           trueLength += trueStep;
           trackLength += trackStep;
           double dt = current.getTimeValue() - last.getTimeValue();
           if (dt > 0) {
-            double vx = (current.getTrackX() - last.getTrackX()) / dt - (current.getTrueX() - last.getTrueX()) / dt;
-            double vy = (current.getTrackY() - last.getTrackY()) / dt - (current.getTrueY() - last.getTrueY()) / dt;
-            double vz = (current.getTrackZ() - last.getTrackZ()) / dt - (current.getTrueZ() - last.getTrueZ()) / dt;
+            double vx =
+                (current.getTrackX() - last.getTrackX()) / dt
+                    - (current.getTrueX() - last.getTrueX()) / dt;
+            double vy =
+                (current.getTrackY() - last.getTrackY()) / dt
+                    - (current.getTrueY() - last.getTrueY()) / dt;
+            double vz =
+                (current.getTrackZ() - last.getTrackZ()) / dt
+                    - (current.getTrueZ() - last.getTrueZ()) / dt;
             velocityErrorSquared += vx * vx + vy * vy + vz * vz;
             velocityCount++;
           }
@@ -69,15 +90,32 @@ public class TrajectoryQualityMetricService {
       }
     }
     double continuity = transitions == 0 ? 1.0 : (double) stable / transitions;
-    return new ExtendedMetrics(count, root(errorSquared2d, count), root(errorSquaredX, count),
-        root(errorSquaredY, count), root(errorSquaredZ, count), endpointError,
-        root(velocityErrorSquared, velocityCount), trueLength, trackLength, continuity,
+    return new ExtendedMetrics(
+        count,
+        root(errorSquared2d, count),
+        root(errorSquaredX, count),
+        root(errorSquaredY, count),
+        root(errorSquaredZ, count),
+        endpointError,
+        root(velocityErrorSquared, velocityCount),
+        trueLength,
+        trackLength,
+        continuity,
         count == 0 ? 0 : 1.0);
   }
 
-  public record ExtendedMetrics(long pointCount, double rmse2d, double rmseX, double rmseY,
-      double rmseZ, double endpointError, double velocityRmse, double trueLength,
-      double trackLength, double continuity, double coverage) {}
+  public record ExtendedMetrics(
+      long pointCount,
+      double rmse2d,
+      double rmseX,
+      double rmseY,
+      double rmseZ,
+      double endpointError,
+      double velocityRmse,
+      double trueLength,
+      double trackLength,
+      double continuity,
+      double coverage) {}
 
   private double root(double value, long count) {
     return count == 0 ? 0 : Math.sqrt(value / count);

@@ -29,8 +29,8 @@ public interface TrackPointMapper {
 
   @Select(
       """
-      SELECT id, track_file_id, sequence_no, time_value, true_x, true_y, true_z,
-             track_x, track_y, track_z, created_at
+      SELECT sequence_no, time_value, true_x, true_y, true_z,
+             track_x, track_y, track_z
       FROM track_point WHERE track_file_id = #{fileId} AND sequence_no > #{afterSequence}
       ORDER BY sequence_no ASC LIMIT #{limit}
       """)

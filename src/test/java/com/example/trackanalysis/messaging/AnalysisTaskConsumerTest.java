@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import com.example.trackanalysis.analysis.application.AnalysisApplicationService;
 import com.example.trackanalysis.common.exception.BusinessException;
 import com.example.trackanalysis.common.exception.ErrorCode;
+import com.example.trackanalysis.common.metrics.AnalysisPerformanceMetrics;
 import com.example.trackanalysis.dataset.infrastructure.persistence.DatasetMapper;
 import com.example.trackanalysis.task.domain.AnalysisTaskStatus;
 import com.example.trackanalysis.task.infrastructure.persistence.AnalysisTaskDO;
@@ -37,6 +38,7 @@ class AnalysisTaskConsumerTest {
   @Mock TrackFileMapper files;
   @Mock DatasetMapper datasets;
   @Mock TaskLeaseHeartbeat heartbeat;
+  @Mock AnalysisPerformanceMetrics performance;
   @Mock Channel channel;
   AnalysisTaskConsumer consumer;
   Message raw;
@@ -54,7 +56,8 @@ class AnalysisTaskConsumerTest {
             datasets,
             new com.example.trackanalysis.task.application.AnalysisTaskProperties(
                 3, 5000, 30000, 5000),
-            heartbeat);
+            heartbeat,
+            performance);
     lenient()
         .when(heartbeat.start(anyLong(), anyString()))
         .thenReturn(

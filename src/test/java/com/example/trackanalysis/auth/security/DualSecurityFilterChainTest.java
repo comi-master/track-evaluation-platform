@@ -82,9 +82,7 @@ class DualSecurityFilterChainTest {
         .perform(get("/login").header("Authorization", "Bearer deliberately-invalid"))
         .andExpect(status().isOk())
         .andExpect(content().string(org.hamcrest.Matchers.containsString("航迹仿真评测平台")))
-        .andExpect(
-            content()
-                .string(org.hamcrest.Matchers.containsString("注册新用户")));
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("注册新用户")));
   }
 
   @Test

@@ -2,6 +2,7 @@ package com.example.trackanalysis.messaging;
 
 import com.example.trackanalysis.analysis.application.AnalysisApplicationService;
 import com.example.trackanalysis.common.exception.BusinessException;
+import com.example.trackanalysis.common.metrics.AnalysisPerformanceMetrics;
 import com.example.trackanalysis.dataset.infrastructure.persistence.DatasetMapper;
 import com.example.trackanalysis.task.application.AnalysisTaskProperties;
 import com.example.trackanalysis.task.domain.AnalysisTaskStatus;
@@ -32,6 +33,7 @@ public class AnalysisTaskConsumer {
   private final DatasetMapper datasets;
   private final AnalysisTaskProperties properties;
   private final TaskLeaseHeartbeat heartbeat;
+  private final AnalysisPerformanceMetrics performance;
   private final String workerId = UUID.randomUUID().toString();
 
   public AnalysisTaskConsumer(
@@ -43,7 +45,8 @@ public class AnalysisTaskConsumer {
       TrackFileMapper files,
       DatasetMapper datasets,
       AnalysisTaskProperties properties,
-      TaskLeaseHeartbeat heartbeat) {
+      TaskLeaseHeartbeat heartbeat,
+      AnalysisPerformanceMetrics performance) {
     this.tasks = tasks;
     this.analysis = analysis;
     this.publisher = publisher;
@@ -53,6 +56,7 @@ public class AnalysisTaskConsumer {
     this.datasets = datasets;
     this.properties = properties;
     this.heartbeat = heartbeat;
+    this.performance = performance;
   }
 
   @RabbitListener(queues = RabbitTopologyConfig.QUEUE, containerFactory = "manualAckFactory")
@@ -105,6 +109,8 @@ public class AnalysisTaskConsumer {
       return;
     }
     task = tasks.selectById(command.taskId());
+    performance.recordBetween("task.queue.wait", task.getCreatedAt(), claimedAt);
+    var executionTimer = performance.start();
     try (TaskLeaseHeartbeat.Lease lease = heartbeat.start(task.getId(), leaseToken)) {
       AnalysisTaskDO running = task;
       analysis.createForTask(
@@ -136,6 +142,8 @@ public class AnalysisTaskConsumer {
       else channel.basicAck(tag, false);
     } catch (RuntimeException temporary) {
       handleTemporary(task, tag, channel, temporary);
+    } finally {
+      performance.stop(executionTimer, "task.execution");
     }
   }
 

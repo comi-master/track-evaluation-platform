@@ -45,8 +45,17 @@ public class AlgorithmSubmissionApplicationService {
       throw new BusinessException(ErrorCode.CONFLICT, "Evaluation protocol is not published");
     if (files.selectOwnedById(request.outputTrackFileId(), userId) == null)
       throw notFound("Output track file");
-    String key = digest(request.projectId() + ":" + request.benchmarkVersionId() + ":" + request.protocolId()
-        + ":" + request.outputTrackFileId() + ":" + request.algorithmVersion().trim());
+    String key =
+        digest(
+            request.projectId()
+                + ":"
+                + request.benchmarkVersionId()
+                + ":"
+                + request.protocolId()
+                + ":"
+                + request.outputTrackFileId()
+                + ":"
+                + request.algorithmVersion().trim());
     AlgorithmSubmissionDO submission = new AlgorithmSubmissionDO();
     submission.setProjectId(request.projectId());
     submission.setBenchmarkVersionId(request.benchmarkVersionId());
@@ -74,9 +83,16 @@ public class AlgorithmSubmissionApplicationService {
   }
 
   private AlgorithmSubmissionResponse response(AlgorithmSubmissionDO x) {
-    return new AlgorithmSubmissionResponse(x.getId(), x.getProjectId(), x.getBenchmarkVersionId(),
-        x.getProtocolId(), x.getOutputTrackFileId(), x.getAlgorithmVersion(), x.getGitCommit(),
-        x.getStatus(), x.getCreatedAt());
+    return new AlgorithmSubmissionResponse(
+        x.getId(),
+        x.getProjectId(),
+        x.getBenchmarkVersionId(),
+        x.getProtocolId(),
+        x.getOutputTrackFileId(),
+        x.getAlgorithmVersion(),
+        x.getGitCommit(),
+        x.getStatus(),
+        x.getCreatedAt());
   }
 
   private BusinessException notFound(String value) {
@@ -85,7 +101,8 @@ public class AlgorithmSubmissionApplicationService {
 
   private String digest(String value) {
     try {
-      byte[] bytes = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+      byte[] bytes =
+          MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
       StringBuilder out = new StringBuilder(64);
       for (byte b : bytes) out.append(String.format("%02x", b));
       return out.toString();

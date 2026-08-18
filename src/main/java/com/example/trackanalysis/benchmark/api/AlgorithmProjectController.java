@@ -11,8 +11,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.List;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -71,6 +71,8 @@ public class AlgorithmProjectController {
       @PathVariable @Min(1) long id,
       @Valid @RequestBody UpdateAlgorithmProjectVisibilityRequest request,
       HttpServletRequest servletRequest) {
-    return Result.success(service.updateVisibility(principal.id(), id, request.visibility()), RequestIdFilter.requestId(servletRequest));
+    return Result.success(
+        service.updateVisibility(principal.id(), id, request.visibility()),
+        RequestIdFilter.requestId(servletRequest));
   }
 }

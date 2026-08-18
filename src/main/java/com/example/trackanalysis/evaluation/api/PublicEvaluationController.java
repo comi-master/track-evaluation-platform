@@ -14,11 +14,19 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/public")
 public class PublicEvaluationController {
   private final EvaluationRunMapper runs;
-  public PublicEvaluationController(EvaluationRunMapper runs) { this.runs = runs; }
+
+  public PublicEvaluationController(EvaluationRunMapper runs) {
+    this.runs = runs;
+  }
+
   @GetMapping("/leaderboard")
-  public Result<List<LeaderboardEntry>> leaderboard(@RequestParam @Min(1) long benchmarkVersionId,
-      @RequestParam @Min(1) long protocolId, @RequestParam(defaultValue = "50") int limit,
+  public Result<List<LeaderboardEntry>> leaderboard(
+      @RequestParam @Min(1) long benchmarkVersionId,
+      @RequestParam @Min(1) long protocolId,
+      @RequestParam(defaultValue = "50") int limit,
       HttpServletRequest request) {
-    return Result.success(runs.selectLeaderboard(benchmarkVersionId, protocolId, Math.min(Math.max(limit, 1), 100)), RequestIdFilter.requestId(request));
+    return Result.success(
+        runs.selectLeaderboard(benchmarkVersionId, protocolId, Math.min(Math.max(limit, 1), 100)),
+        RequestIdFilter.requestId(request));
   }
 }

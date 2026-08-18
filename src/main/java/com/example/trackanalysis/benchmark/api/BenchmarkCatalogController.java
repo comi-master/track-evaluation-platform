@@ -15,15 +15,52 @@ public class BenchmarkCatalogController {
   private final BenchmarkMapper benchmarks;
   private final BenchmarkVersionMapper versions;
   private final EvaluationProtocolMapper protocols;
-  public BenchmarkCatalogController(BenchmarkMapper benchmarks, BenchmarkVersionMapper versions, EvaluationProtocolMapper protocols) { this.benchmarks = benchmarks; this.versions = versions; this.protocols = protocols; }
+
+  public BenchmarkCatalogController(
+      BenchmarkMapper benchmarks,
+      BenchmarkVersionMapper versions,
+      EvaluationProtocolMapper protocols) {
+    this.benchmarks = benchmarks;
+    this.versions = versions;
+    this.protocols = protocols;
+  }
+
   @GetMapping("/benchmarks")
   public Result<List<BenchmarkCatalogResponse>> benchmarks(HttpServletRequest request) {
-    var data = benchmarks.selectPublished().stream().map(b -> new BenchmarkCatalogResponse(b.getId(), b.getName(), b.getDescription(), versions.selectPublishedByBenchmark(b.getId()).stream().map(v -> new BenchmarkVersionResponse(v.getId(), v.getVersionNo(), v.getFormatVersion(), v.getDescription())).toList())).toList();
+    var data =
+        benchmarks.selectPublished().stream()
+            .map(
+                b ->
+                    new BenchmarkCatalogResponse(
+                        b.getId(),
+                        b.getName(),
+                        b.getDescription(),
+                        versions.selectPublishedByBenchmark(b.getId()).stream()
+                            .map(
+                                v ->
+                                    new BenchmarkVersionResponse(
+                                        v.getId(),
+                                        v.getVersionNo(),
+                                        v.getFormatVersion(),
+                                        v.getDescription()))
+                            .toList()))
+            .toList();
     return Result.success(data, RequestIdFilter.requestId(request));
   }
+
   @GetMapping("/protocols")
   public Result<List<EvaluationProtocolResponse>> protocols(HttpServletRequest request) {
-    var data = protocols.selectPublished().stream().map(p -> new EvaluationProtocolResponse(p.getId(), p.getName(), p.getVersionNo(), p.getDescription(), p.getRulesJson())).toList();
+    var data =
+        protocols.selectPublished().stream()
+            .map(
+                p ->
+                    new EvaluationProtocolResponse(
+                        p.getId(),
+                        p.getName(),
+                        p.getVersionNo(),
+                        p.getDescription(),
+                        p.getRulesJson()))
+            .toList();
     return Result.success(data, RequestIdFilter.requestId(request));
   }
 }

@@ -60,7 +60,12 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             requests ->
                 requests
-                    .requestMatchers("/api/v1/ping", "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/catalog/**", "/api/v1/public/**")
+                    .requestMatchers(
+                        "/api/v1/ping",
+                        "/api/v1/auth/register",
+                        "/api/v1/auth/login",
+                        "/api/v1/catalog/**",
+                        "/api/v1/public/**")
                     .permitAll()
                     .anyRequest()
                     .authenticated())

@@ -1,8 +1,8 @@
 package com.example.trackanalysis.web;
 
-import com.example.trackanalysis.auth.application.WebIdentityService;
-import com.example.trackanalysis.auth.application.AuthApplicationService;
 import com.example.trackanalysis.auth.api.RegisterRequest;
+import com.example.trackanalysis.auth.application.AuthApplicationService;
+import com.example.trackanalysis.auth.application.WebIdentityService;
 import com.example.trackanalysis.common.exception.BusinessException;
 import com.example.trackanalysis.common.logging.RequestIdFilter;
 import com.example.trackanalysis.user.application.UserProfileService;
@@ -51,7 +51,12 @@ public class WebPageController {
       HttpServletRequest request,
       RedirectAttributes flash) {
     var identity = identityService.requireActive(principal.getName());
-    profiles.updateProfile(identity.id(), displayName, email, RequestIdFilter.requestId(request), request.getRemoteAddr());
+    profiles.updateProfile(
+        identity.id(),
+        displayName,
+        email,
+        RequestIdFilter.requestId(request),
+        request.getRemoteAddr());
     flash.addFlashAttribute("success", "用户信息已更新");
     return "redirect:/app/profile";
   }
@@ -141,8 +146,10 @@ public class WebPageController {
 
   public record RegistrationForm(
       @jakarta.validation.constraints.NotBlank(message = "请输入用户名")
-          @Size(min = 3, max = 64, message = "用户名长度为 3-64 个字符") String username,
+          @Size(min = 3, max = 64, message = "用户名长度为 3-64 个字符")
+          String username,
       @jakarta.validation.constraints.NotBlank(message = "请输入密码")
-          @Size(min = 8, max = 64, message = "密码长度为 8-64 个字符") String password,
+          @Size(min = 8, max = 64, message = "密码长度为 8-64 个字符")
+          String password,
       @jakarta.validation.constraints.NotBlank(message = "请再次输入密码") String confirmPassword) {}
 }

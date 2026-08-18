@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.trackanalysis.analysis.api.*;
 import com.example.trackanalysis.analysis.infrastructure.persistence.*;
 import com.example.trackanalysis.common.exception.*;
+import com.example.trackanalysis.common.metrics.AnalysisPerformanceMetrics;
 import com.example.trackanalysis.dataset.infrastructure.persistence.DatasetMapper;
 import com.example.trackanalysis.track.domain.ParseStatus;
 import com.example.trackanalysis.track.infrastructure.persistence.*;
@@ -24,6 +25,7 @@ public class AnalysisApplicationService {
   private final AnalysisProperties props;
   private final DatasetMapper datasets;
   private final AnalysisCacheService cache;
+  private final AnalysisPerformanceMetrics performance;
 
   public AnalysisApplicationService(
       TrackFileMapper files,
@@ -34,7 +36,8 @@ public class AnalysisApplicationService {
       Clock clock,
       AnalysisProperties props,
       DatasetMapper datasets,
-      AnalysisCacheService cache) {
+      AnalysisCacheService cache,
+      AnalysisPerformanceMetrics performance) {
     this.files = files;
     this.points = points;
     this.results = results;
@@ -44,6 +47,7 @@ public class AnalysisApplicationService {
     this.props = props;
     this.datasets = datasets;
     this.cache = cache;
+    this.performance = performance;
   }
 
   public AnalysisResponse create(long user, long file, double threshold) {
@@ -69,18 +73,23 @@ public class AnalysisApplicationService {
   private AnalysisResponse execute(long file, double threshold, LongConsumer completion) {
     Computed c = compute(file, threshold);
     if (c.count == 0) throw new BusinessException(ErrorCode.CONFLICT, "Track file has no points");
-    return tx.execute(
-        s -> {
-          AnalysisResultDO r = c.result(file, threshold, LocalDateTime.now(clock));
-          results.insert(r);
-          for (AbnormalIntervalDO i : c.intervals) {
-            i.setAnalysisResultId(r.getId());
-            i.setCreatedAt(r.getCreatedAt());
-          }
-          if (!c.intervals.isEmpty()) intervals.batchInsert(c.intervals);
-          completion.accept(r.getId());
-          return response(r, c.intervals);
-        });
+    var writeTimer = performance.start();
+    try {
+      return tx.execute(
+          s -> {
+            AnalysisResultDO r = c.result(file, threshold, LocalDateTime.now(clock));
+            results.insert(r);
+            for (AbnormalIntervalDO i : c.intervals) {
+              i.setAnalysisResultId(r.getId());
+              i.setCreatedAt(r.getCreatedAt());
+            }
+            if (!c.intervals.isEmpty()) intervals.batchInsert(c.intervals);
+            completion.accept(r.getId());
+            return response(r, c.intervals);
+          });
+    } finally {
+      performance.stop(writeTimer, "result.write");
+    }
   }
 
   public AnalysisResponse latest(long user, long file) {
@@ -171,20 +180,31 @@ public class AnalysisApplicationService {
     long lastSeq = -1;
     double lastTime = Double.NEGATIVE_INFINITY;
     for (; ; ) {
-      var batch = points.selectAfterSequence(file, lastSeq, props.batchSize());
+      var readTimer = performance.start();
+      List<TrackPointDO> batch;
+      try {
+        batch = points.selectAfterSequence(file, lastSeq, props.batchSize());
+      } finally {
+        performance.stop(readTimer, "points.read");
+      }
       if (batch.isEmpty()) break;
-      for (var p : batch) {
-        if (p.getSequenceNo() <= lastSeq || p.getTimeValue() <= lastTime)
-          throw new BusinessException(ErrorCode.CONFLICT, "Track point ordering is invalid");
-        double e = error(p);
-        c.add(e, p.getTimeValue());
-        boolean ab = e > threshold;
-        if (ab) {
-          if (c.open == null || p.getSequenceNo() != c.open.getEndSequence() + 1) c.close();
-          c.open(c, p, e);
-        } else c.close();
-        lastSeq = p.getSequenceNo();
-        lastTime = p.getTimeValue();
+      var computeTimer = performance.start();
+      try {
+        for (var p : batch) {
+          if (p.getSequenceNo() <= lastSeq || p.getTimeValue() <= lastTime)
+            throw new BusinessException(ErrorCode.CONFLICT, "Track point ordering is invalid");
+          double e = error(p);
+          c.add(e, p.getTimeValue());
+          boolean ab = e > threshold;
+          if (ab) {
+            if (c.open == null || p.getSequenceNo() != c.open.getEndSequence() + 1) c.close();
+            c.open(c, p, e);
+          } else c.close();
+          lastSeq = p.getSequenceNo();
+          lastTime = p.getTimeValue();
+        }
+      } finally {
+        performance.stop(computeTimer, "metrics.compute");
       }
     }
     c.close();

@@ -24,10 +24,12 @@ public class WebIdentityService {
       throw new BusinessException(ErrorCode.UNAUTHORIZED, "The account is no longer active");
     }
     List<String> roles = userMapper.selectRoleCodes(user.getId());
-    return new WebIdentity(user.getId(), user.getUsername(), user.getDisplayName(), user.getEmail(), roles);
+    return new WebIdentity(
+        user.getId(), user.getUsername(), user.getDisplayName(), user.getEmail(), roles);
   }
 
-  public record WebIdentity(long id, String username, String displayName, String email, List<String> roles) {
+  public record WebIdentity(
+      long id, String username, String displayName, String email, List<String> roles) {
     public String primaryRole() {
       return roles == null || roles.isEmpty() ? "RESEARCHER" : roles.get(0);
     }
